@@ -691,6 +691,9 @@ class GUI:
                 self.EdgeCircles = {} # Circles at edge of line to denote line selection. self.EdgeCircles[circle_id] = Circle. Circle = {'line_id': line_id, 'position': center_xy}
 
                 self.stitcher.reset_stitcher()
+
+                del self.tracker
+                self.tracker = cv2.TrackerCSRT_create()
                 
 
         self.window.close()
@@ -1128,7 +1131,7 @@ def make_window2() -> sg.Window:
            ]
 
     layout = [[sg.Push(), sg.B('Help')],
-              [sg.Push(),
+              [sg.B('Track'), sg.Push(),
                 sg.Slider(s=(30, 20), range=(0, 100), k="-SLIDER-", orientation="h",
                             enable_events=True, expand_x=True), sg.Text("0/0", k="-COUNTER-"),
                 sg.B("Previous Frame", key="-P FRAME-", tooltip='[LEFT KEY]\n<-'), sg.B("Play", key="-PLAY-", tooltip='[SPACE]'),
