@@ -73,9 +73,6 @@ class GUI:
         self.min_match_num = self.stitcher.min_match_num
         self.f = self.stitcher.f
 
-        # Tracker variables
-        self.tracker = cv2.TrackerCSRT_create()
-
         # Start threading to load video correctly
         self.thread(self.update)
 
@@ -262,19 +259,6 @@ class GUI:
                 # Send a graph event to update the magnifier
                 self.window.write_event_value('-GRAPH-+MOVE+', None)
 
-
-            if event == 'Track':
-                frame = self.frame_locations[0][0]
-                frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
-                # Taken from https://broutonlab.com/blog/opencv-object-tracking
-                # Select the bounding box in the first frame
-                bbox = cv2.selectROI('Select Reigon of Interest', frame, True)
-                if bbox == (0, 0, 0, 0):
-                    continue
-                cv2.destroyAllWindows()
-                self.tracker.init(frame, bbox)
-
-                self.thread(self.track)
 
 
             # Called if play button was pressed
