@@ -847,6 +847,29 @@ class GUI:
         # self.update()
 
 
+    def track(self):
+        '''
+        Track an already intitiated item on self.tracker.
+        '''
+        # Start tracking
+        for i in range(self.num_frames):
+            frame = self.frame_locations[i][0]
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB)
+            ret, bbox = self.tracker.update(frame)
+            if ret:
+                print(f'Found ROI {i}')
+                p1 = (int(bbox[0]), int(bbox[1]))
+                p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
+                cv2.rectangle(frame, p1, p2, (255,0,0), 2, 1)
+            else:
+                print(f'Tracking failure detected {i}')
+                cv2.putText(frame, "Tracking failure detected", (100,80),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
+
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+            self.frame_locations[i] = (frame, None)
+
+
 
     # --- GUI draw functions --- #
 
@@ -877,7 +900,7 @@ class GUI:
         # First time loading a frame    
         if image_id is None:
             image_id = graph.tk_canvas.create_image((0, 0), image=frame, anchor=tk.NW)
-            # we must mimic the way sg.Graph keeps a track of its added objects:
+            # we must mimic the way sg.Graph keeps track of its added objects:
             graph.Images[image_id] = frame
         else:
             # we reuse the image object, only changing its content
