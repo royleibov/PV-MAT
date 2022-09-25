@@ -691,9 +691,6 @@ class GUI:
                 self.EdgeCircles = {} # Circles at edge of line to denote line selection. self.EdgeCircles[circle_id] = Circle. Circle = {'line_id': line_id, 'position': center_xy}
 
                 self.stitcher.reset_stitcher()
-
-                del self.tracker
-                self.tracker = cv2.TrackerCSRT_create()
                 
 
         self.window.close()
@@ -848,29 +845,6 @@ class GUI:
             # print(f"        update time: {delay}")
             time.sleep(delay)
         # self.update()
-
-
-    def track(self):
-        '''
-        Track an already intitiated item on self.tracker.
-        '''
-        # Start tracking
-        for i in range(self.num_frames):
-            frame = self.frame_locations[i][0]
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB)
-            ret, bbox = self.tracker.update(frame)
-            if ret:
-                print(f'Found ROI {i}')
-                p1 = (int(bbox[0]), int(bbox[1]))
-                p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-                cv2.rectangle(frame, p1, p2, (255,0,0), 2, 1)
-            else:
-                print(f'Tracking failure detected {i}')
-                cv2.putText(frame, "Tracking failure detected", (100,80),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
-
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
-            self.frame_locations[i] = (frame, None)
 
 
 
@@ -1131,7 +1105,7 @@ def make_window2() -> sg.Window:
            ]
 
     layout = [[sg.Push(), sg.B('Help')],
-              [sg.B('Track'),sg.Push(),
+              [sg.Push(),
                 sg.Slider(s=(30, 20), range=(0, 100), k="-SLIDER-", orientation="h",
                             enable_events=True, expand_x=True), sg.Text("0/0", k="-COUNTER-"),
                 sg.B("Previous Frame", key="-P FRAME-", tooltip='[LEFT KEY]\n<-'), sg.B("Play", key="-PLAY-", tooltip='[SPACE]'),
