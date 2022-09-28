@@ -75,6 +75,13 @@ class GUI:
 
         # Tracker variables
         self.tracker = cv2.TrackerCSRT_create()
+        self.bounding_boxes = []
+        self.draw_bounding_boxes = False
+        self.bounding_id = None
+        self.pano_width = 0
+        self.pano_height = 0
+        self.path_id = None
+        self.COM_path = []
 
         # Start threading to load video correctly
         self.thread(self.update)
@@ -189,15 +196,15 @@ class GUI:
                 self.magnify_width, self.magnify_height = get_element_size(self.magnify)
 
                 # Display the panorama
-                pano_height, pano_width = self.panorama.shape[:2]
-                print(pano_width, pano_height)
+                self.pano_height, self.pano_width = self.panorama.shape[:2]
+                print(self.pano_width, self.pano_height)
 
                 # Set new graph size
                 self.graph_width = 1280
-                self.graph_height = int(self.graph_width * pano_height / pano_width)
+                self.graph_height = int(self.graph_width * self.pano_height / self.pano_width)
                 if self.graph_height > 480:
                     self.graph_height = 480
-                    self.graph_width = int(self.graph_height * pano_width / pano_height)
+                    self.graph_width = int(self.graph_height * self.pano_width / self.pano_height)
 
                 self.graph.set_size((self.graph_width, self.graph_height))
                 self.graph.change_coordinates(graph_bottom_left = (0, self.graph_height), graph_top_right = (self.graph_width, 0))
@@ -269,6 +276,7 @@ class GUI:
                 # Taken from https://broutonlab.com/blog/opencv-object-tracking
                 # Select the bounding box in the first frame
                 bbox = cv2.selectROI('Select Reigon of Interest', frame, True)
+                print(f'bbox: {bbox} 0')
                 if bbox == (0, 0, 0, 0):
                     continue
                 cv2.destroyAllWindows()
@@ -279,15 +287,39 @@ class GUI:
 
             # Called if play button was pressed
             if event == '-THREAD UPDATE-':
-                self.image = self.draw_image(values[event], image_id=self.image)
-                self.update_counter()
+                if self.image:
+                    self.image = self.draw_image(values[event], image_id=self.image)
+                    self.update_counter()
 
+            if self.draw_bounding_boxes:
+                top_left, bottom_right = self.bounding_boxes[self.current_frame_num - 1]
+                if self.bounding_id:
+                    self.graph.delete_figure(self.bounding_id)
+                if -1 in (top_left, bottom_right):
+                    continue
+                self.bounding_id = self.graph.draw_rectangle(top_left=top_left,
+                                                        bottom_right=bottom_right,
+                                                        line_color='red', line_width=2)
+
+                if values['-PATH-']:
+                    points = [point for point in self.COM_path[:self.current_frame_num - 1] if point != -1]
+
+                    if self.path_id:
+                        self.graph.delete_figure(self.path_id)
+
+                    self.path_id = self.graph.draw_lines(points, color = 'white')
+
+            if len(self.COM_path) > 0:
+                if not values['-PATH-']:
+                    if self.path_id:
+                        self.graph.delete_figure(self.path_id)
+                        self.path_id = None
 
             # Switch from feet and inches to meters
             if event == '-METERS-':
-                inches_to_meters_ration = 1 / 39.37 # meters / inches
+                inches_to_meters_ratio = 1 / 39.37 # meters / inches
 
-                self.calibration_ratio *= inches_to_meters_ration
+                self.calibration_ratio *= inches_to_meters_ratio
 
                 self.distance_units = 'Meters'
 
@@ -299,9 +331,9 @@ class GUI:
 
             # Switch from meters to feet and inches
             if event == '-FEET-':
-                meters_to_inches_ration = 39.37 # inches / meters
+                meters_to_inches_ratio = 39.37 # inches / meters
 
-                self.calibration_ratio *= meters_to_inches_ration
+                self.calibration_ratio *= meters_to_inches_ratio
 
                 self.distance_units = 'Feet and Inches'
 
@@ -388,7 +420,7 @@ class GUI:
                         bounding_height = abs(y1_c - y0_c)
 
                         shrink_percent = 75
-                        shrink_factor = (shrink_percent / 100) * 1/2
+                        shrink_factor = (shrink_percent / 100) / 2
 
                         # Change size of circle as displayed in magnifier area
                         x0_c += round(bounding_width * shrink_factor)
@@ -582,6 +614,7 @@ class GUI:
                     if values['-CLEAR-']:
                         print('clear')
                         self.graph.erase()
+                        del self.Lines
                         self.Lines = {}
                         self.PIL_pano = self.draw_image(self.panorama)
                         self.image = self.goto_frame(self.current_frame_num)
@@ -655,6 +688,8 @@ class GUI:
                 if not values['-SELECT-']:
                     for circle_id in self.EdgeCircles.keys():
                         self.graph.delete_figure(circle_id)
+
+                    del self.EdgeCircles
                     self.EdgeCircles = {}
 
             if event == 'Back':
@@ -685,15 +720,26 @@ class GUI:
                 self.lastxy = None # To calculate delta of movement
                 self.last_figure = None # Last draw figure ID
                 self.calibration_ratio = -1 # Known distance in units / pixel distance
+                del self.Lines
                 self.Lines = {} # Save all the line objects: self.Lines[line_id] = [(x1,y1), (x2, y2)]
                 self.calibrating = False # Bool to tell if in calibration mode
                 self.pixel_dist = -1 # line's pixel distance
+                del self.EdgeCircles
                 self.EdgeCircles = {} # Circles at edge of line to denote line selection. self.EdgeCircles[circle_id] = Circle. Circle = {'line_id': line_id, 'position': center_xy}
 
                 self.stitcher.reset_stitcher()
 
+                # Reset tracker
                 del self.tracker
                 self.tracker = cv2.TrackerCSRT_create()
+                del self.bounding_boxes
+                self.bounding_boxes = []
+                self.draw_bounding_boxes = False
+                self.bounding_id = None
+                self.pano_height = self.pano_width = 0
+                self.path_id = None
+                del self.COM_path
+                self.COM_path = []
                 
 
         self.window.close()
@@ -860,18 +906,23 @@ class GUI:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB)
             ret, bbox = self.tracker.update(frame)
             if ret:
-                print(f'Found ROI {i}')
-                p1 = (int(bbox[0]), int(bbox[1]))
-                p2 = (int(bbox[0] + bbox[2]), int(bbox[1] + bbox[3]))
-                cv2.rectangle(frame, p1, p2, (255,0,0), 2, 1)
+                p1 = (int(bbox[0] * self.graph_width / self.pano_width),
+                        int(bbox[1] * self.graph_height / self.pano_height)) # Upper left
+                p2 = (int((bbox[0] + bbox[2]) * self.graph_width / self.pano_width),
+                        int((bbox[1] + bbox[3]) * self.graph_height / self.pano_height)) # Lower right
+                mid_point = (int((p1[0] + p2[0]) / 2) , int((p1[1] + p2[1]) / 2))
+                print(f'Found ROI {i}: {p1}, {p2}')
+                print(f'bbox: {bbox} {i}')
+                self.bounding_boxes.append((p1, p2))
+                self.COM_path.append(mid_point)
             else:
                 print(f'Tracking failure detected {i}')
-                cv2.putText(frame, "Tracking failure detected", (100,80),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.75,(0,0,255),2)
+                print(f'bbox: {bbox} {i}')
+                self.bounding_boxes.append((-1, -1))
+                self.COM_path.append(-1)
 
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
-            self.frame_locations[i] = (frame, None)
-
+        self.draw_bounding_boxes = True
+        print('Done!')
 
 
     # --- GUI draw functions --- #
@@ -1131,7 +1182,7 @@ def make_window2() -> sg.Window:
            ]
 
     layout = [[sg.Push(), sg.B('Help')],
-              [sg.B('Track'), sg.Push(),
+              [sg.B('Track'), sg.Check('Draw Path', k='-PATH-'), sg.Push(),
                 sg.Slider(s=(30, 20), range=(0, 100), k="-SLIDER-", orientation="h",
                             enable_events=True, expand_x=True), sg.Text("0/0", k="-COUNTER-"),
                 sg.B("Previous Frame", key="-P FRAME-", tooltip='[LEFT KEY]\n<-'), sg.B("Play", key="-PLAY-", tooltip='[SPACE]'),
