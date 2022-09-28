@@ -82,6 +82,7 @@ class GUI:
         self.pano_height = 0
         self.path_id = None
         self.COM_path = []
+        self.draw_path = False
 
         # Start threading to load video correctly
         self.thread(self.update)
@@ -135,6 +136,10 @@ class GUI:
                 self.progressbar['-TEXT-'].update(text)
 
                 self.progressbar.refresh()
+
+            # Tracking progress meter
+            if event == '-TRACKING PROGRESS-':
+                sg.one_line_progress_meter('Tracking...', values[event] + 1, self.num_frames)
 
 
             if event == '-STITCHER DONE-':
@@ -271,6 +276,18 @@ class GUI:
 
 
             if event == 'Track':
+                # Stop any video play
+                self.play = False
+                
+                # Reset previous tracking session
+                del self.tracker
+                self.tracker = cv2.TrackerCSRT_create()
+                del self.bounding_boxes
+                self.bounding_boxes = []
+                self.draw_bounding_boxes = False
+                del self.COM_path
+                self.COM_path = []
+
                 frame = self.frame_locations[0][0]
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
                 # Taken from https://broutonlab.com/blog/opencv-object-tracking
@@ -284,6 +301,11 @@ class GUI:
 
                 self.thread(self.track)
 
+            # Tracker done. Draw bounding boxes
+            if event == '-TRACKER DONE-':
+                self.window['-BOX-'].update(True)
+                self.draw_bounding_boxes = True
+
 
             # Called if play button was pressed
             if event == '-THREAD UPDATE-':
@@ -291,29 +313,57 @@ class GUI:
                     self.image = self.draw_image(values[event], image_id=self.image)
                     self.update_counter()
 
+            # A change in drawing bounding box
+            if event == '-BOX-':
+                # Set to True
+                if values[event]:
+                    self.draw_bounding_boxes = True
+                else:
+                    self.draw_bounding_boxes = False
+                    if self.bounding_id:
+                        self.graph.delete_figure(self.bounding_id)
+                        self.bounding_id = None
+
+            # A change in drawing COM path
+            if event == '-PATH-':
+                # Set to True
+                if values[event]:
+                    self.draw_path = True
+                else:
+                    self.draw_path = False
+                    if self.path_id:
+                        self.graph.delete_figure(self.path_id)
+                        self.path_id = None
+
+            # Drawing the bounding boxes
             if self.draw_bounding_boxes:
+                # Get current frame's bounding box
                 top_left, bottom_right = self.bounding_boxes[self.current_frame_num - 1]
+
+                # If there's a box on screen clear it
                 if self.bounding_id:
                     self.graph.delete_figure(self.bounding_id)
+                # If frame's box was a tracking failure do nothing
                 if -1 in (top_left, bottom_right):
                     continue
+
+                # Draw the box and save figure's id
                 self.bounding_id = self.graph.draw_rectangle(top_left=top_left,
                                                         bottom_right=bottom_right,
                                                         line_color='red', line_width=2)
 
-                if values['-PATH-']:
-                    points = [point for point in self.COM_path[:self.current_frame_num - 1] if point != -1]
+            # Drawing the Center Of Mass (COM) path
+            if self.draw_path:
+                # Aquire all points of COM up until current frame. Exclude frames with tracking failure
+                points = [point for point in self.COM_path[:self.current_frame_num - 1] if point != -1]
 
-                    if self.path_id:
-                        self.graph.delete_figure(self.path_id)
+                # Clear any exsitent path previously drawn
+                if self.path_id:
+                    self.graph.delete_figure(self.path_id)
 
-                    self.path_id = self.graph.draw_lines(points, color = 'white')
+                # Draw path and save its id
+                self.path_id = self.graph.draw_lines(points, color = 'white')
 
-            if len(self.COM_path) > 0:
-                if not values['-PATH-']:
-                    if self.path_id:
-                        self.graph.delete_figure(self.path_id)
-                        self.path_id = None
 
             # Switch from feet and inches to meters
             if event == '-METERS-':
@@ -740,6 +790,7 @@ class GUI:
                 self.path_id = None
                 del self.COM_path
                 self.COM_path = []
+                self.draw_path = False
                 
 
         self.window.close()
@@ -920,8 +971,9 @@ class GUI:
                 print(f'bbox: {bbox} {i}')
                 self.bounding_boxes.append((-1, -1))
                 self.COM_path.append(-1)
+            self.window.write_event_value('-TRACKING PROGRESS-', i)
 
-        self.draw_bounding_boxes = True
+        self.window.write_event_value('-TRACKER DONE-', None)
         print('Done!')
 
 
@@ -1182,9 +1234,9 @@ def make_window2() -> sg.Window:
            ]
 
     layout = [[sg.Push(), sg.B('Help')],
-              [sg.B('Track'), sg.Check('Draw Path', k='-PATH-'), sg.Push(),
-                sg.Slider(s=(30, 20), range=(0, 100), k="-SLIDER-", orientation="h",
-                            enable_events=True, expand_x=True), sg.Text("0/0", k="-COUNTER-"),
+              [sg.B('Track'), sg.Check('Draw Path', k='-PATH-', enable_events=True), sg.Check('Draw Bounding Box', k='-BOX-', enable_events=True),
+                sg.Push(),sg.Slider(s=(30, 20), range=(0, 100), k="-SLIDER-", orientation="h",
+                                        enable_events=True, expand_x=True), sg.Text("0/0", k="-COUNTER-"),
                 sg.B("Previous Frame", key="-P FRAME-", tooltip='[LEFT KEY]\n<-'), sg.B("Play", key="-PLAY-", tooltip='[SPACE]'),
                 sg.B("Next Frame", key="-N FRAME-", tooltip='[RIGHT KEY]\n->'),
                 sg.Push(), sg.Frame('Units',
