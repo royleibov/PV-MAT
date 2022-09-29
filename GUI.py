@@ -278,7 +278,7 @@ class GUI:
             if event == 'Track':
                 # Stop any video play
                 self.play = False
-                
+
                 # Reset previous tracking session
                 del self.tracker
                 self.tracker = cv2.TrackerCSRT_create()
@@ -294,9 +294,10 @@ class GUI:
                 # Select the bounding box in the first frame
                 bbox = cv2.selectROI('Select Reigon of Interest', frame, True)
                 print(f'bbox: {bbox} 0')
+                cv2.destroyAllWindows()
                 if bbox == (0, 0, 0, 0):
                     continue
-                cv2.destroyAllWindows()
+                
                 self.tracker.init(frame, bbox)
 
                 self.thread(self.track)
@@ -654,7 +655,7 @@ class GUI:
                         print('erase')
 
                         for fig in figures:
-                            if fig not in (self.PIL_pano, self.image):
+                            if fig in self.Lines:
                                 print(fig)
                                 print(self.Lines[fig])
                                 self.Lines.pop(fig)

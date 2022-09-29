@@ -460,13 +460,15 @@ class Stitcher(object):
 
         debug_count = 1
         num_frames = len(frames)
+
+
+        self.set_min_match_num(0)
+        self.set_max_match_num(np.inf)
+
         for frame in frames:
 
             h1, w1 = frame.shape[0:2]
             h2, w2 = panorama.shape[0:2]
-
-            self.set_min_match_num(-np.inf)
-            self.set_max_match_num(np.inf)
 
             success_H, H = self.find_homography(frame, panorama)
 
