@@ -2,6 +2,7 @@
 GUI for the panoramic stitching app
 '''
 
+from faulthandler import disable
 import threading
 import sys
 import tkinter as tk
@@ -74,6 +75,7 @@ class GUI:
         self.f = self.stitcher.f
 
         # Tracker variables
+        self.fps = None
         self.tracker = cv2.TrackerCSRT_create()
         self.bounding_boxes = []
         self.draw_bounding_boxes = False
@@ -83,6 +85,11 @@ class GUI:
         self.path_id = None
         self.COM_path = []
         self.draw_path = False
+        self.velocities = [] # In pixels/second
+        self.velocity_text_id = None
+        self.draw_velocity = False
+        self.vel_units_ratio = -1 # Turn self.calibration_ratio/second to self.velocity_units
+        self.velocity_units = 'km/h'
 
         # Start threading to load video correctly
         self.thread(self.update)
@@ -150,6 +157,8 @@ class GUI:
 
                 self.panorama = values[event]
 
+                self.fps = self.stitcher.get_fps()
+                assert self.fps, "Problem reading video." # shouldn't happen
                 success_dump, frame_dump = self.stitcher.get_frame_dump()
 
                 if success_dump:
@@ -302,10 +311,27 @@ class GUI:
 
                 self.thread(self.track)
 
+            if event == '-VEL UNITS-':
+                self.velocity_units = values[event]
+                self.set_velocity_units()
+
             # Tracker done. Draw bounding boxes
             if event == '-TRACKER DONE-':
-                self.window['-BOX-'].update(True)
+                self.window['-BOX-'].update(True, disabled=False)
                 self.draw_bounding_boxes = True
+
+                self.window['-PATH-'].update(disabled=False)
+
+                self.draw_track()
+
+                if self.calibration_ratio > 0:
+                    self.thread(self.calculate_velocity)
+
+                    self.window['-VELOCITY-'].update(True, disabled=False)
+                    self.draw_velocity = True
+                    self.window['-VEL UNITS-'].update(disabled=False)
+
+                    self.set_velocity_units()
 
 
             # Called if play button was pressed
@@ -324,6 +350,7 @@ class GUI:
                     if self.bounding_id:
                         self.graph.delete_figure(self.bounding_id)
                         self.bounding_id = None
+                self.draw_track()
 
             # A change in drawing COM path
             if event == '-PATH-':
@@ -335,63 +362,49 @@ class GUI:
                     if self.path_id:
                         self.graph.delete_figure(self.path_id)
                         self.path_id = None
+                self.draw_track()
 
-            # Drawing the bounding boxes
-            if self.draw_bounding_boxes:
-                # Get current frame's bounding box
-                top_left, bottom_right = self.bounding_boxes[self.current_frame_num - 1]
+            if event == '-VELOCITY-':
+                # Set to True
+                if values[event]:
+                    self.draw_velocity = True
+                else:
+                    self.draw_velocity = False
+                    if self.velocity_text_id:
+                        self.graph.delete_figure(self.velocity_text_id)
+                        self.velocity_text_id = None
+                self.draw_track()
 
-                # If there's a box on screen clear it
-                if self.bounding_id:
-                    self.graph.delete_figure(self.bounding_id)
-                # If frame's box was a tracking failure do nothing
-                if -1 in (top_left, bottom_right):
-                    continue
-
-                # Draw the box and save figure's id
-                self.bounding_id = self.graph.draw_rectangle(top_left=top_left,
-                                                        bottom_right=bottom_right,
-                                                        line_color='red', line_width=2)
-
-            # Drawing the Center Of Mass (COM) path
-            if self.draw_path:
-                # Aquire all points of COM up until current frame. Exclude frames with tracking failure
-                points = [point for point in self.COM_path[:self.current_frame_num - 1] if point != -1]
-
-                # Clear any exsitent path previously drawn
-                if self.path_id:
-                    self.graph.delete_figure(self.path_id)
-
-                # Draw path and save its id
-                self.path_id = self.graph.draw_lines(points, color = 'white')
 
 
             # Switch from feet and inches to meters
             if event == '-METERS-':
+                # Recalibrate
                 inches_to_meters_ratio = 1 / 39.37 # meters / inches
-
                 self.calibration_ratio *= inches_to_meters_ratio
 
+                # Set units
                 self.distance_units = 'Meters'
+                self.set_velocity_units()
 
+                # Change GUI
                 self.text.update('Select a line to see the difference.')
-
                 self.window['-LINE-'].reset_group()
-
                 self.graph.set_cursor('arrow')
 
             # Switch from meters to feet and inches
             if event == '-FEET-':
+                # Recalibrate
                 meters_to_inches_ratio = 39.37 # inches / meters
-
                 self.calibration_ratio *= meters_to_inches_ratio
 
+                # Set units
                 self.distance_units = 'Feet and Inches'
+                self.set_velocity_units()
 
+                # Change GUI
                 self.text.update('Select a line to see the difference.')
-
                 self.window['-LINE-'].reset_group()
-
                 self.graph.set_cursor('arrow')
 
 
@@ -405,7 +418,7 @@ class GUI:
 
                 half_magnifier_size = int(values['-MAGNIFY SIZE-'] / 2)
 
-                # Upper left eft x and y
+                # Upper left x and y
                 x0, y0 = center_x - half_magnifier_size, center_y + half_magnifier_size
 
                 self.magnify_square_id = self.graph.draw_rectangle(top_left=(x0, y0),
@@ -509,19 +522,33 @@ class GUI:
                 print('up')
                 # Handle calibration
                 if self.calibrating and self.pixel_dist > 0:
-                    distance, self.distance_units = popup_get_distance()
-
-                    if self.distance_units == 'Meters':
-                        self.window['-METERS-'].update(True)
-                    else:
-                        self.window['-FEET-'].update(True)
+                    distance, distance_units = popup_get_distance()
 
                     # If distance was given
                     if distance > 0:
-                        self.calibration_ratio = distance / self.pixel_dist
+                        self.calibration_ratio = distance / self.pixel_dist # Either in inches/px or meters/px
+
+                        if distance_units == 'Meters':
+                            self.window['-METERS-'].update(True)
+                        else:
+                            self.window['-FEET-'].update(True)
+                        self.distance_units = distance_units
+
                         self.window['-CALIB-'].update(button_color=('white', '#283b5b'))
                         self.text.update(f'Line set to {convert_to_units(distance, self.distance_units)}', text_color='white')
+
                         self.enable_toolbox()
+
+                        # Claculate velocities when a calibration is set and a tracking was made
+                        if len(self.COM_path) > 0:
+                            self.thread(self.calculate_velocity)
+
+                            self.window['-VELOCITY-'].update(True, disabled=False)
+                            self.draw_velocity = True
+                            self.window['-VEL UNITS-'].update(disabled=False)
+
+                            self.set_velocity_units()
+
                     else: # Cancled without giving a distance. Exit calibration mode
                         # Delete the line
                         if self.last_figure:
@@ -532,14 +559,23 @@ class GUI:
                         if self.calibration_ratio < 0:
                             self.window['-LINE-'].update(False, disabled=True)
                             self.window['-SELECT-'].update(False, disabled=True)
+
                             self.cursor = 'arrow'
                             self.graph.set_cursor(self.cursor)
+
                             self.text.update('Please calibrate the ruler by dragging a line of a known distance.')
                         else:
                             self.enable_toolbox()
+
                             self.cursor = 'cross'
                             self.graph.set_cursor(self.cursor)
+
                             self.text.update('Please make a measurment by dragging a line!', text_color='white')
+
+                            if values['-METERS-']:
+                                self.distance_units = 'Meters'
+                            else:
+                                self.distance_units = 'Feet and Inches'
 
                         self.window['-CALIB-'].update(button_color=('white', '#283b5b'))
 
@@ -669,6 +705,7 @@ class GUI:
                         self.Lines = {}
                         self.PIL_pano = self.draw_image(self.panorama)
                         self.image = self.goto_frame(self.current_frame_num)
+                        self.draw_track()
 
 
             # Calibration button was pressed
@@ -792,6 +829,12 @@ class GUI:
                 del self.COM_path
                 self.COM_path = []
                 self.draw_path = False
+                del self.velocities
+                self.velocities = []
+                self.velocity_text_id = None
+                self.draw_velocity = False
+                self.vel_units_ratio = -1
+                self.velocity_units = 'km/h'
                 
 
         self.window.close()
@@ -825,6 +868,9 @@ class GUI:
         self.counter.update(f'{frame_num}/{self.num_frames}')
         self.slider.update(value=frame_num)
 
+        # Update the track drawing (if exists) only on frame change or settings change
+        self.draw_track()
+
     def update_distance(self, pixle_distance: int):
         '''
         Update the distance text based on the given distance.
@@ -857,6 +903,25 @@ class GUI:
         self.window['-SELECT-'].update(disabled=False)
         self.window['-ERASE-'].update(disabled=True)
         self.window['-CLEAR-'].update(disabled=True)
+
+    def set_velocity_units(self):
+        '''
+        Set the velocity units ratio depending on the wanted units and the distance units.
+        '''
+        # Do nothing if either no calibration was made or no tracking was done
+        if self.calibration_ratio < 0 or len(self.bounding_boxes) == 0:
+            return
+
+        meters_per_second_to_velocity_units = {'m/s': 1, 'km/h': 3.6, 'ft/s': 3.281, 'mph': 2.237}
+        inches_per_second_to_velocity_units = {'m/s': 0.0254, 'km/h': 0.09144, 'ft/s': 0.0833, 'mph': 0.05682}
+
+        if self.distance_units == 'Meters':
+            self.vel_units_ratio = meters_per_second_to_velocity_units[self.velocity_units]
+        elif self.distance_units == 'Feet and Inches':
+            self.vel_units_ratio = inches_per_second_to_velocity_units[self.velocity_units]
+
+        self.draw_track()
+
 
     def select_and_move(self, figure_id: int, delta: Tuple[int, int]):
         '''
@@ -954,31 +1019,161 @@ class GUI:
         '''
         # Start tracking
         for i in range(self.num_frames):
+            # Aquire frame
             frame = self.frame_locations[i][0]
             frame = cv2.cvtColor(frame, cv2.COLOR_BGRA2RGB)
+
+            # Get next bounding box
             ret, bbox = self.tracker.update(frame)
+
             if ret:
+                # Top left point of bbox in graph coordinates
                 p1 = (int(bbox[0] * self.graph_width / self.pano_width),
-                        int(bbox[1] * self.graph_height / self.pano_height)) # Upper left
+                        int(bbox[1] * self.graph_height / self.pano_height))
+
+                # Bottom right point of bbox in graph coordinates
                 p2 = (int((bbox[0] + bbox[2]) * self.graph_width / self.pano_width),
-                        int((bbox[1] + bbox[3]) * self.graph_height / self.pano_height)) # Lower right
+                        int((bbox[1] + bbox[3]) * self.graph_height / self.pano_height))
+                
+                # Middile point of bbox
                 mid_point = (int((p1[0] + p2[0]) / 2) , int((p1[1] + p2[1]) / 2))
+
                 print(f'Found ROI {i}: {p1}, {p2}')
                 print(f'bbox: {bbox} {i}')
+
+                # Svae the points
                 self.bounding_boxes.append((p1, p2))
                 self.COM_path.append(mid_point)
-            else:
+
+            else: # Couldn't find the tracked object
                 print(f'Tracking failure detected {i}')
                 print(f'bbox: {bbox} {i}')
+
+                # Save filler points
                 self.bounding_boxes.append((-1, -1))
                 self.COM_path.append(-1)
+
+            # Update progressbar
             self.window.write_event_value('-TRACKING PROGRESS-', i)
 
+        # Activate features after tracker is done
         self.window.write_event_value('-TRACKER DONE-', None)
         print('Done!')
 
 
+    def calculate_velocity(self):
+        '''
+        Calculate the object's velocity.
+        '''
+        # Reset velocities
+        del self.velocities
+        self.velocities = []
+
+        num_mid_points = len(self.COM_path) # Total number of mid points
+        assert num_mid_points > 0, "Called velocity calculation with no object tracked"
+        assert self.calibration_ratio > 0, "Called velocity calculation with no distance calibration"
+
+        seconds_per_frame = 1 / self.fps
+
+        self.velocities.append(0.0)
+
+        for i in range(1, num_mid_points - 1):
+            # Aquire points
+            before, current, after = self.COM_path[i-1], self.COM_path[i], self.COM_path[i+1]
+
+            if current == -1:
+                self.velocities.append(0.0)
+                continue
+
+            before_delta = 1
+            while before == -1:
+                try:
+                    before = self.COM_path[i-1-before_delta]
+                    before_delta += 1
+                except IndexError:
+                    before = current
+
+            after_delta = 1
+            while after == -1:
+                try:
+                    after = self.COM_path[i+1+after_delta]
+                    after_delta += 1
+                except IndexError:
+                    after == current
+            
+            # Calculate length of lines
+            # https://stackoverflow.com/questions/1401712/how-can-the-euclidean-distance-be-calculated-with-numpy
+            dist_before = np.linalg.norm(np.array(before) - np.array(current))
+            dist_after = np.linalg.norm(np.array(current) - np.array(after))
+
+            total_dist = dist_before + dist_after
+
+            # Velocity at self.COM_path[i] by average of delta_t
+            avg_velocity = total_dist / ((before_delta + after_delta) * seconds_per_frame)
+
+            self.velocities.append(avg_velocity)
+        
+        self.velocities.append(0.0)
+        print(self.velocities)
+
+
     # --- GUI draw functions --- #
+
+    def draw_track(self):
+        '''
+        Draw bounding box, path, or velocity
+        '''
+        # Drawing the Center Of Mass (COM) path
+        if self.draw_path:
+            # Aquire all points of COM up until current frame. Exclude frames with tracking failure
+            points = [point for point in self.COM_path[:self.current_frame_num - 1] if point != -1]
+
+            # Clear any exsitent path previously drawn
+            if self.path_id:
+                self.graph.delete_figure(self.path_id)
+
+            # Draw path and save its id
+            self.path_id = self.graph.draw_lines(points, color = 'white', width=2)
+
+        # Drawing the bounding boxes and velocities
+        if len(self.bounding_boxes) >= self.current_frame_num:
+            # Get current frame's bounding box
+            top_left, bottom_right = self.bounding_boxes[self.current_frame_num - 1]
+
+            # If frame's box was a tracking failure do nothing
+            if -1 in (top_left, bottom_right):
+                return
+
+            # Draw bounding box if checked
+            if self.draw_bounding_boxes:
+                # If there's a box on screen clear it
+                if self.bounding_id:
+                    self.graph.delete_figure(self.bounding_id)
+
+                # Draw the box and save figure's id
+                self.bounding_id = self.graph.draw_rectangle(top_left=top_left,
+                                                        bottom_right=bottom_right,
+                                                        line_color='red', line_width=2)
+
+            # Draw velocities iff current frame's velocity exists AND draw velocities is checked
+            if len(self.velocities) >= self.current_frame_num and self.draw_velocity:
+                # Delete previous text
+                if self.velocity_text_id:
+                    self.graph.delete_figure(self.velocity_text_id)
+
+                # Sanity checks. Shouldn't fire.
+                assert self.calibration_ratio > 0, "Problem calculating velocities with no distance calibration"
+                assert self.vel_units_ratio > 0, "Problem calculating velocities with no velocity units calibration"
+
+                print(f'In frame {self.current_frame_num}, vel in {self.distance_units}/sec: {self.velocities[self.current_frame_num - 1] * self.calibration_ratio}')
+                # Convert px/sec to self.velocity_units units
+                velocity = self.velocities[self.current_frame_num - 1] * self.calibration_ratio * self.vel_units_ratio
+                print(f'vel in {self.velocity_units}: {velocity}')
+
+                # Print text to screen
+                velocity_text = f'Vel: {velocity:.3} {self.velocity_units}'
+                self.velocity_text_id = self.graph.draw_text(velocity_text, (top_left[0], top_left[1]-20), font='_ 20', color='white')
+
 
     def draw_image(self, frame, graph = None, image_id: int = None) -> Union[int, None]:
         """
@@ -1235,7 +1430,10 @@ def make_window2() -> sg.Window:
            ]
 
     layout = [[sg.Push(), sg.B('Help')],
-              [sg.B('Track'), sg.Check('Draw Path', k='-PATH-', enable_events=True), sg.Check('Draw Bounding Box', k='-BOX-', enable_events=True),
+              [sg.B('Track'), sg.Check('Draw Path', k='-PATH-', enable_events=True, disabled=True),
+                sg.Check('Draw Bounding Box', k='-BOX-', enable_events=True, disabled=True),
+                sg.Check('Show Velocity', disabled=True, k='-VELOCITY-', enable_events=True),
+                sg.Combo(['m/s', 'km/h', 'ft/s', 'mph'], default_value='km/h', k='-VEL UNITS-', enable_events=True, disabled=True, readonly=True),
                 sg.Push(),sg.Slider(s=(30, 20), range=(0, 100), k="-SLIDER-", orientation="h",
                                         enable_events=True, expand_x=True), sg.Text("0/0", k="-COUNTER-"),
                 sg.B("Previous Frame", key="-P FRAME-", tooltip='[LEFT KEY]\n<-'), sg.B("Play", key="-PLAY-", tooltip='[SPACE]'),
@@ -1351,7 +1549,7 @@ def popup_get_distance() -> Tuple[Union[float, None], str]:
                     continue
             else: # Units == Meters
                 try:
-                    value = float(distance)
+                    value = float(distance) # In meters
                 except ValueError:
                     window['-IN-'].update('')
                     window.write_event_value('-IN-+FOCUS OUT+', None)
@@ -1369,6 +1567,7 @@ def convert_to_units(measurment: Union[int, float], units: str) -> str:
     '''
     measurment_text = ''
     if units == 'Feet and Inches':
+        # Convert from [inches] to [feet'inches and fraction of an inch"]
         feet = int(measurment // 12)
         inches = int(measurment % 12)
         fraction_inch = Fraction(int(8 * ((measurment % 12) - inches)), 8) if measurment % 12 != 0 else 0

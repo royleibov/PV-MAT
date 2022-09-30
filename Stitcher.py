@@ -30,6 +30,7 @@ class Stitcher(object):
         self.frame_dump = []
 
         self.__filepath = None
+        self.FPS = None
 
         self.min_match_num = 40
         self.max_match_num = max_match
@@ -60,6 +61,7 @@ class Stitcher(object):
         # Construct VideoCapture object to get frame-by-frame stream\
         vid_cap = cv2.VideoCapture(self.__filepath)
         total_frames = int(vid_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.FPS = vid_cap.get(cv2.CAP_PROP_FPS)
 
         # glutInit(sys.argv)
 
@@ -431,6 +433,13 @@ class Stitcher(object):
         Returns the resize factor.
         '''
         return self.__resize
+
+    def get_fps(self) -> float:
+        '''
+        Returns the video's FPS.
+        '''
+
+        return self.FPS
 
     def set_window(self, window: sg.Window):
         '''
