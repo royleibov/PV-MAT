@@ -4,7 +4,7 @@ GUI for the panoramic stitching app
 
 from faulthandler import disable
 import threading
-import sys
+import gc
 import tkinter as tk
 import time
 import glob
@@ -17,7 +17,7 @@ from fractions import Fraction
 from PIL import ImageTk, Image, ImageDraw
 from Stitcher import Stitcher
 from typing import Callable, List, Tuple, Union
-    
+
 
 class GUI:
     '''
@@ -112,7 +112,7 @@ class GUI:
                     self.max_match_num = self.stitcher.max_match_num
                     self.min_match_num = self.stitcher.min_match_num
                     self.f = self.stitcher.f
-            
+        
             # Handle help
             if event == 'Help':
                 help_window()
@@ -232,7 +232,7 @@ class GUI:
                 self.counter.update(f'1/{self.num_frames}')
 
                 self.window.refresh()
-                
+    
                 self.window.move_to_center()
 
 
@@ -306,7 +306,7 @@ class GUI:
                 cv2.destroyAllWindows()
                 if bbox == (0, 0, 0, 0):
                     continue
-                
+
                 self.tracker.init(frame, bbox)
 
                 self.thread(self.track)
@@ -427,7 +427,7 @@ class GUI:
 
                 # Draw the sample region on the magnifier
                 self.window.write_event_value('-GRAPH-', (center_x, center_y))
-            
+
             # Mouse lifted from slider
             if event == '-MAGNIFY SIZE-+UP+':
                 self.graph.delete_figure(self.magnify_square_id)
@@ -440,7 +440,7 @@ class GUI:
                 # print('Moving!')
                 # Set the magnifing square window: (magnify_size, magnify_size)
                 magnify_size = values['-MAGNIFY SIZE-']
- 
+
                 x, y = values['-GRAPH-']
                 if None in (x, y):
                     continue
@@ -463,13 +463,13 @@ class GUI:
 
                     for propreties in self.Lines.values():
                         draw.line(propreties[:2], fill='white', width=1)
-                    
+
                     # Check if hovering above or selecting a circle
                     on_circle = False
                     for circle_id in self.EdgeCircles:
                         # Gets circle's bounding boxes
                         top_left, bottom_right = self.graph.get_bounding_box(circle_id)
-                        
+
                         # Check if hovering above or selecting a circle
                         if (top_left[0] < x < bottom_right[0] and top_left[1] < y < bottom_right[1]):
                             on_circle = True
@@ -491,7 +491,7 @@ class GUI:
                         x1_c -= round(bounding_width * shrink_factor)
                         y0_c += round(bounding_height * shrink_factor)
                         y1_c -= round(bounding_height * shrink_factor)
-                        
+
                         # Draw the circle
                         draw.ellipse([x0_c, y0_c, x1_c, y1_c], fill='#2d65a4', outline='white')
 
@@ -502,7 +502,7 @@ class GUI:
                     elif values['-SELECT-'] and self.cursor != 'fleur':
                         self.cursor = 'fleur'
                         self.graph.set_cursor(self.cursor)
-                               
+
                     # Crop magnify bounding box
                     frame = frame.crop((x1, y1, x2, y2))
                     frame = PIL.ImageTk.PhotoImage(image=frame.resize((self.magnify_width, self.magnify_height), PIL.Image.NEAREST))
@@ -510,7 +510,7 @@ class GUI:
                     # Draw on magnify area
                     self.magnify_id = self.draw_on_canvas(frame, self.magnify, self.magnify_id)
                     self.cross_id = self.draw_cross(self.magnify, self.cross_id)
-                
+
                 except IndexError:
                     print("ERROR")
                     # No image is diplayed in main graph
@@ -623,7 +623,7 @@ class GUI:
                         if self.last_figure:
                             self.Lines.pop(self.last_figure)
                             self.graph.delete_figure(self.last_figure)
-                        
+
                         self.last_figure = self.graph.draw_line(self.start_point, self.end_point, color='white', width=2)
 
                         self.Lines[self.last_figure] = [self.start_point, self.end_point, self.pixel_dist]
@@ -657,7 +657,7 @@ class GUI:
                                 if self.last_figure:
                                     self.Lines.pop(self.last_figure)
                                     self.graph.delete_figure(self.last_figure)
-                                
+
                                 # Redraw line
                                 self.last_figure = self.graph.draw_line(my_circle['position'], other_circle['position'], color='white', width=2)
                                 self.graph.bring_figure_to_front(fig)
@@ -733,22 +733,7 @@ class GUI:
                         self.text.update('Please calibrate the ruler by dragging a line of a known distance.')
                         self.window['-LINE-'].update(False, disabled=True)
 
-            
-            if event == 'Debug':
-                self.window.perform_long_operation(debug, '-DEBUG-')
-                sg.show_debugger_popout_window()
 
-            if event == '-DEBUG-':
-                self.panorama, frame_dump = values[event]
-
-                self.window.write_event_value('-LOCATOR DONE-', [(frame, None) for frame in frame_dump])
-
-                # Make the progress bar
-                self.progressbar = make_progressbar()
-
-                # self.window.perform_long_operation(lambda : self.stitcher.locate_frames(self.panorama, frame_dump), '-LOCATOR DONE-')
-
-            
             # Change cursor by toolbar selection
             if event == '-LINE-':
                 self.cursor = 'cross'
@@ -784,15 +769,14 @@ class GUI:
                 # Setup the starting window
                 self.window.close()
                 del self.window
-
                 self.window = make_window1()
-                self.stitcher.set_window(self.window)
+
+                del self.stitcher
+                self.stitcher = Stitcher(self.window, self.max_match_num, self.f)
 
                 # Reset the stitcher
-                self.stitcher.set_max_match_num(self.max_match_num)
                 self.stitcher.set_min_match_num(self.min_match_num)
                 self.stitcher.set_f(self.f)
-                self.stitcher.set_resize_factor(1)
 
                 # Reset the working app
                 self.PIL_pano = None
@@ -835,12 +819,12 @@ class GUI:
                 self.draw_velocity = False
                 self.vel_units_ratio = -1
                 self.velocity_units = 'km/h'
+
+                gc.collect()
                 
 
         self.window.close()
         del self.window
-        sys.exit()
-
 
 
 
@@ -1339,19 +1323,6 @@ A:  Technically not a question but I'll allow it.
     window.close()
     del window
 
-def debug() -> None:
-    '''
-    Jump to visual debugging.
-    '''
-    frames = []
-    file_names = sorted(glob.glob('key_frames/frame_dump/frame[0-9][0-9]*.jpg'))
-    for frame_name in file_names:
-        img = cv2.imread(frame_name, cv2.IMREAD_UNCHANGED)
-        if img is not None:
-            frames.append(img)
-    panorama = cv2.imread('key_frames/frame_dump/panorama.jpg')
-    return (panorama, frames)
-
 def expert_mode_window(stitcher: Stitcher, min_num: int, max_num:int, f: int):
     '''
     A window to chagne the stitcher's parameters.
@@ -1411,7 +1382,7 @@ def make_window1() -> sg.Window:
            [sg.Text(font='_ 14', text='Please upload as short a video as you can.')],
            [sg.Text('Also pretty please, make sure the video is shot with minimal vertical movement (or else the algorithm freaks).', font='_ 14')],
            [sg.In(key="-FILEPATH-", enable_events=True), sg.FileBrowse("Browse", font='_ 14')],
-           [sg.Debug('Debug', font='_ 14'), sg.B('Exit', k='-EXIT-', font='_ 14')]]
+           [sg.B('Exit', k='-EXIT-', font='_ 14')]]
 
     layout = [[sg.Text(expand_x=True, expand_y=True, font='ANY 1', pad=(0, 0))],  # the thing that expands from top
               [sg.Column(col, element_justification='center' ,vertical_alignment='center', justification='center', expand_x=True, expand_y=True)]]
