@@ -84,6 +84,7 @@ class GUI:
         self.pano_width = 0
         self.pano_height = 0
         self.path_id = None
+        self.COM_points = []
         self.COM_path = []
         self.draw_path = False
         self.velocities = [] # In pixels/second
@@ -194,6 +195,7 @@ class GUI:
                 self.graph.bind('<Motion>', '+MOVE+')
                 self.graph.bind('<ButtonRelease-1>', '+UP+')
                 self.graph.bind('<ButtonPress-1>', '+DOWN+')
+                self.graph.bind('<Shift-1>', '+SHIFT+')
 
                 self.slider = self.window['-SLIDER-']
                 self.counter = self.window['-COUNTER-']
@@ -303,16 +305,6 @@ class GUI:
                 self.text.current_background = 'red'
                 self.window.refresh()
 
-                # Reset previous tracking session
-                del self.tracker
-                self.tracker = cv2.TrackerCSRT_create()
-                del self.bounding_boxes
-                self.bounding_boxes = []
-                self.draw_bounding_boxes = False
-                del self.COM_path
-                self.COM_path = []
-                gc.collect()
-
                 frame = self.frame_locations[0][0]
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
                 # Taken from https://broutonlab.com/blog/opencv-object-tracking
@@ -326,6 +318,20 @@ class GUI:
 
                     self.window['-PLAY-'].set_focus()
                     continue
+
+                # Reset previous tracking session
+                del self.tracker
+                self.tracker = cv2.TrackerCSRT_create()
+                del self.bounding_boxes
+                self.bounding_boxes = []
+                self.draw_bounding_boxes = False
+                del self.COM_points
+                self.COM_points = []
+                del self.COM_path
+                self.COM_path = []
+                del self.velocities
+                self.velocities = []
+                gc.collect()
 
                 self.tracker.init(frame, bbox)
 
@@ -589,7 +595,7 @@ class GUI:
                         self.enable_toolbox()
 
                         # Calculate velocities when a calibration is set and a tracking was made
-                        if len(self.COM_path) > 0:
+                        if len(self.COM_points) > 0:
                             self.thread(self.calculate_velocity)
 
                             self.window['-VELOCITY-'].update(True, disabled=False)
@@ -677,7 +683,6 @@ class GUI:
                         # https://stackoverflow.com/questions/1401712/how-can-the-euclidean-distance-be-calculated-with-numpy
                         self.pixel_dist = np.linalg.norm(np.array(self.start_point) - np.array(self.end_point))
 
-                        #TODO: Only allows one line to be drawn on screen
                         # Save space
                         if self.last_figure:
                             self.Lines.pop(self.last_figure)
@@ -911,8 +916,8 @@ class GUI:
                 self.bounding_id = None
                 self.pano_height = self.pano_width = 0
                 self.path_id = None
-                del self.COM_path
-                self.COM_path = []
+                del self.COM_points
+                self.COM_points = []
                 self.draw_path = False
                 del self.velocities
                 self.velocities = []
@@ -920,6 +925,8 @@ class GUI:
                 self.draw_velocity = False
                 self.vel_units_ratio = -1
                 self.velocity_units = 'km/h'
+                del self.COM_path
+                self.COM_path = []
 
                 gc.collect()
                 
@@ -1146,7 +1153,11 @@ class GUI:
 
                 # Svae the points
                 self.bounding_boxes.append((p1, p2))
-                self.COM_path.append(mid_point)
+                self.COM_points.append(mid_point)
+                try:
+                    self.COM_path.append(self.COM_path[i-1]+[mid_point])
+                except IndexError:
+                    self.COM_path.append([mid_point])
 
             else: # Couldn't find the tracked object
                 print(f'Tracking failure detected {i}')
@@ -1154,7 +1165,11 @@ class GUI:
 
                 # Save filler points
                 self.bounding_boxes.append((-1, -1))
-                self.COM_path.append(-1)
+                self.COM_points.append(-1)
+                try:
+                    self.COM_path.append(self.COM_path[i-1])
+                except IndexError:
+                    self.COM_path.append([])
 
             # Update progressbar
             self.window.write_event_value('-TRACKING PROGRESS-', i)
@@ -1173,7 +1188,7 @@ class GUI:
         self.velocities = []
         gc.collect()
 
-        num_mid_points = len(self.COM_path) # Total number of mid points
+        num_mid_points = len(self.COM_points) # Total number of mid points
         assert num_mid_points > 0, "Called velocity calculation with no object tracked"
         assert self.calibration_ratio > 0, "Called velocity calculation with no distance calibration"
 
@@ -1183,7 +1198,7 @@ class GUI:
 
         for i in range(1, num_mid_points - 1):
             # Aquire points
-            before, current, after = self.COM_path[i-1], self.COM_path[i], self.COM_path[i+1]
+            before, current, after = self.COM_points[i-1], self.COM_points[i], self.COM_points[i+1]
 
             if current == -1:
                 self.velocities.append(0.0)
@@ -1192,7 +1207,7 @@ class GUI:
             before_delta = 1
             while before == -1:
                 try:
-                    before = self.COM_path[i-1-before_delta]
+                    before = self.COM_points[i-1-before_delta]
                     before_delta += 1
                 except IndexError:
                     before = current
@@ -1200,10 +1215,10 @@ class GUI:
             after_delta = 1
             while after == -1:
                 try:
-                    after = self.COM_path[i+1+after_delta]
+                    after = self.COM_points[i+1+after_delta]
                     after_delta += 1
                 except IndexError:
-                    after == current
+                    after = current
             
             # Calculate length of lines
             # https://stackoverflow.com/questions/1401712/how-can-the-euclidean-distance-be-calculated-with-numpy
@@ -1212,7 +1227,7 @@ class GUI:
 
             total_dist = dist_before + dist_after
 
-            # Velocity at self.COM_path[i] by average of delta_t
+            # Velocity at self.COM_points[i] by average of delta_t
             avg_velocity = total_dist / ((before_delta + after_delta) * seconds_per_frame)
 
             self.velocities.append(avg_velocity)
@@ -1230,7 +1245,7 @@ class GUI:
         # Drawing the Center Of Mass (COM) path
         if self.draw_path:
             # Aquire all points of COM up until current frame. Exclude frames with tracking failure
-            points = [point for point in self.COM_path[:self.current_frame_num - 1] if point != -1]
+            points = self.COM_path[self.current_frame_num - 1]
 
             # Clear any exsitent path previously drawn
             if self.path_id:
@@ -1244,16 +1259,20 @@ class GUI:
             # Get current frame's bounding box
             top_left, bottom_right = self.bounding_boxes[self.current_frame_num - 1]
 
+            # If there's a box on screen clear it
+            if self.bounding_id:
+                self.graph.delete_figure(self.bounding_id)
+
+            # Delete previous text
+            if self.velocity_text_id:
+                self.graph.delete_figure(self.velocity_text_id)
+
             # If frame's box was a tracking failure do nothing
             if -1 in (top_left, bottom_right):
                 return
 
             # Draw bounding box if checked
             if self.draw_bounding_boxes:
-                # If there's a box on screen clear it
-                if self.bounding_id:
-                    self.graph.delete_figure(self.bounding_id)
-
                 # Draw the box and save figure's id
                 self.bounding_id = self.graph.draw_rectangle(top_left=top_left,
                                                         bottom_right=bottom_right,
@@ -1261,10 +1280,6 @@ class GUI:
 
             # Draw velocities iff current frame's velocity exists AND draw velocities is checked
             if len(self.velocities) >= self.current_frame_num and self.draw_velocity:
-                # Delete previous text
-                if self.velocity_text_id:
-                    self.graph.delete_figure(self.velocity_text_id)
-
                 # Sanity checks. Shouldn't fire.
                 assert self.calibration_ratio > 0, "Problem calculating velocities with no distance calibration"
                 assert self.vel_units_ratio > 0, "Problem calculating velocities with no velocity units calibration"
