@@ -303,13 +303,23 @@ class GUI:
                 self.text.current_background = 'red'
                 self.window.refresh()
 
+                make_tracking_window()
+
                 frame = self.frame_locations[0][0]
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
                 # Taken from https://broutonlab.com/blog/opencv-object-tracking
                 # Select the bounding box in the first frame
+                cv2.namedWindow('Select Reigon of Interest')
+                window_width, window_height = sg.Window.get_screen_size()
+                move_height = (window_height - self.pano_height) // 2
+                move_width = (window_width - self.pano_width) // 2
+                cv2.moveWindow('Select Reigon of Interest', move_width, move_height)
+
                 bbox = cv2.selectROI('Select Reigon of Interest', frame, True)
+
                 print(f'bbox: {bbox} 0')
                 cv2.destroyAllWindows()
+
                 if bbox == (0, 0, 0, 0):
                     self.text.update(current_text, background_color=current_bg)
                     self.text.current_background = current_bg
@@ -1502,7 +1512,7 @@ def expert_mode_window(stitcher: Stitcher, min_num: int, max_num:int, f: int):
                sg.Text('?', font='_ 14', size=(1,1), tooltip='Controls the amount by which the quality decreases.\nBest for debuging and perfecting the\nappropriate parameters for a given video.')],
               [sg.B('Save', font='_ 14')]]
 
-    window = sg.Window('Expert Mode', layout, text_justification='c', finalize=True, resizable=True)
+    window = sg.Window('Expert Mode', layout, text_justification='c', finalize=True, resizable=True, modal=True, keep_on_top=True)
 
     values = None
 
@@ -1537,6 +1547,23 @@ def make_progressbar() -> sg.Window:
                 [sg.Push(), sg.Text('Loading...', key='-TEXT-', font=('Helvetica', 16)), sg.Push()]]
 
     return sg.Window("Making the panorama...", layout, finalize=True, disable_close=True, keep_on_top=True)
+
+def make_tracking_window():
+    '''
+    Make the tracking explaination window popup.
+    '''
+    layout = [[sg.Text('Track Object', font='_ 16')],
+              [sg.Text('Select by dragging a rectangle on the image.', font='_ 14')],
+              [sg.Text('To begin tracking, press the ENTER or SPACE keys on your keyboard.', font='_ 14')],
+              [sg.Text('To cancel the tracking, press the C letter key on your keyboard.', font='_ 14')],
+              [sg.B('Next', font='_ 14')]]
+
+    window = sg.Window("Track Object", layout, finalize=True, disable_close=True, keep_on_top=True, element_justification='c', text_justification='c', modal=True)
+
+    while window.read()[0] not in ('Next', None):
+        continue
+    window.close()
+    del window
 
 def make_window1() -> sg.Window:
     '''
