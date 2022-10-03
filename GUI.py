@@ -7,7 +7,6 @@ import gc
 import tkinter as tk
 import time
 import re
-from turtle import right
 import numpy as np
 import cv2
 import PIL
@@ -62,7 +61,7 @@ class GUI:
         self.calibrating = False # Bool to tell if in calibration mode
         self.pixel_dist = -1 # line's pixel distance
         self.EdgeCircles = {} # Circles at edge of line to denote line selection. self.EdgeCircles[circle_id] = Circle. Circle = {'line_id': line_id, 'position': center_xy}
-        self.distance_text_id = None
+        self.distance_text_id = {}
         self.draw_distance_text = False
 
         # Stitcher object and variables
@@ -459,6 +458,8 @@ class GUI:
                     self.graph.set_cursor(self.cursor)
                     self.text.update('Select the line to drag or resize.')
 
+                self.window.write_event_value('-SHOW DIS-', values['-SHOW DIS-'])
+
 
 
             # There's a change of magnify size
@@ -484,6 +485,16 @@ class GUI:
             if event == '-MAGNIFY SIZE-+UP+':
                 self.graph.delete_figure(self.magnify_square_id)
 
+
+            if event == '-SHOW DIS-':
+                self.draw_distance_text = values[event]
+
+                lines = self.Lines.copy()
+                if self.last_figure and values['-SELECT-']:
+                    lines.pop(self.last_figure)
+
+                for line_id in lines:
+                    self.update_distance(line_id, self.draw_distance_text)
 
 
             # Draw magnified area into Magnify graph.
@@ -589,7 +600,7 @@ class GUI:
                         self.distance_units = distance_units
 
                         self.window['-CALIB-'].update(button_color=('white', '#283b5b'))
-                        self.update_distance(self.last_figure)
+                        self.update_distance(self.last_figure, True)
 
                         self.enable_toolbox()
 
@@ -615,11 +626,12 @@ class GUI:
                         if self.last_figure:
                             self.Lines.pop(self.last_figure)
                             self.graph.delete_figure(self.last_figure)
-                            self.last_figure = None
 
-                            if self.distance_text_id:
-                                self.graph.delete_figure(self.distance_text_id)
-                                self.distance_text_id = None
+                            if self.last_figure in self.distance_text_id:
+                                self.graph.delete_figure(self.distance_text_id[self.last_figure])
+                                self.distance_text_id.pop(self.last_figure)
+                            
+                            self.last_figure = None
 
                         # Haven't previously set a calibration
                         if self.calibration_ratio < 0:
@@ -687,11 +699,17 @@ class GUI:
                             self.Lines.pop(self.last_figure)
                             self.graph.delete_figure(self.last_figure)
 
+                            if self.last_figure in self.distance_text_id:
+                                self.graph.delete_figure(self.distance_text_id[self.last_figure])
+
+                        for line_id in self.Lines:
+                            self.update_distance(line_id, self.draw_distance_text)
+
                         self.last_figure = self.graph.draw_line(self.start_point, self.end_point, color='white', width=2)
 
                         self.Lines[self.last_figure] = [self.start_point, self.end_point, self.pixel_dist]
 
-                        self.update_distance(self.last_figure)
+                        self.update_distance(self.last_figure, True)
 
                     # Drag item
                     if values['-SELECT-']:
@@ -720,6 +738,9 @@ class GUI:
                                     self.Lines.pop(self.last_figure)
                                     self.graph.delete_figure(self.last_figure)
 
+                                    if self.last_figure in self.distance_text_id:
+                                        self.graph.delete_figure(self.distance_text_id[self.last_figure])
+
                                 # Redraw line
                                 self.last_figure = self.graph.draw_line(my_circle['position'], other_circle['position'], color='white', width=2)
                                 self.graph.bring_figure_to_front(fig)
@@ -735,10 +756,17 @@ class GUI:
                                 self.EdgeCircles[other_id] = other_circle
 
                                 # Update text
-                                self.update_distance(self.last_figure)
+                                self.update_distance(self.last_figure, True)
 
                             # Moving just the line or selecting it
                             elif fig in self.Lines:
+                                if fig not in self.distance_text_id:
+                                    lines = self.Lines.copy()
+                                    lines.pop(fig)
+
+                                    for line_id in lines:
+                                        self.update_distance(line_id, self.draw_distance_text)
+
                                 self.last_figure = fig
 
                                 self.graph.move_figure(fig, delta_x, delta_y)
@@ -765,12 +793,12 @@ class GUI:
                                 self.Lines.pop(fig)
                                 self.graph.delete_figure(fig)
 
-                                if self.last_figure == fig:
-                                    self.last_figure = None
+                                if fig in self.distance_text_id:
+                                    self.graph.delete_figure(self.distance_text_id[fig])
+                                    self.distance_text_id.pop(fig)
 
-                                    if self.distance_text_id:
-                                        self.graph.delete_figure(self.distance_text_id)
-                                        self.distance_text_id = None
+                                if fig == self.last_figure:
+                                    self.last_figure = None
 
                     # Erase all items
                     if values['-CLEAR-']:
@@ -782,7 +810,8 @@ class GUI:
                         self.image = self.goto_frame(self.current_frame_num)
                         self.draw_track()
                         self.last_figure = None
-                        self.distance_text_id = None
+                        del self.distance_text_id
+                        self.distance_text_id = {}
 
 
             # Calibration button was pressed
@@ -816,9 +845,8 @@ class GUI:
 
             # Change cursor by toolbar selection
             if event == '-LINE-':
-                if self.distance_text_id:
-                    self.graph.delete_figure(self.distance_text_id)
-                    self.distance_text_id = None
+                if self.last_figure in self.distance_text_id:
+                    self.update_distance(self.last_figure, self.draw_distance_text)
 
                 self.cursor = 'cross'
                 self.graph.set_cursor(self.cursor)
@@ -827,28 +855,26 @@ class GUI:
             if event == '-SELECT-':
                 if self.last_figure:
                     self.select_and_move(self.last_figure, (0,0))
-                elif self.distance_text_id:
-                    self.graph.delete_figure(self.distance_text_id)
-                    self.distance_text_id = None
+                elif self.last_figure in self.distance_text_id:
+                    self.graph.delete_figure(self.distance_text_id[self.last_figure])
+                    self.distance_text_id.pop(self.last_figure)
 
                 self.cursor = 'fleur'
                 self.graph.set_cursor(self.cursor)
                 self.text.update('Select the line to drag or resize.')
             
             if event == '-ERASE-':
-                if self.distance_text_id:
-                    self.graph.delete_figure(self.distance_text_id)
-                    self.distance_text_id = None
-
+                if self.last_figure in self.distance_text_id:
+                    self.update_distance(self.last_figure, self.draw_distance_text)
+                    
                 self.cursor = 'X_cursor'
                 self.graph.set_cursor(self.cursor)
                 self.text.update('Select a line to erase.')
             
             if event == '-CLEAR-':
-                if self.distance_text_id:
-                    self.graph.delete_figure(self.distance_text_id)
-                    self.distance_text_id = None
-
+                if self.last_figure in self.distance_text_id:
+                    self.update_distance(self.last_figure, self.draw_distance_text)
+                    
                 self.cursor = 'iron_cross'
                 self.graph.set_cursor(self.cursor)
                 self.text.update('Press anywhere on the image to delete all the lines.')
@@ -901,7 +927,7 @@ class GUI:
                 self.pixel_dist = -1 # line's pixel distance
                 del self.EdgeCircles
                 self.EdgeCircles = {} # Circles at edge of line to denote line selection. self.EdgeCircles[circle_id] = Circle. Circle = {'line_id': line_id, 'position': center_xy}
-                self.distance_text_id = None
+                self.distance_text_id = {}
                 self.draw_distance_text = False
 
                 self.stitcher.reset_stitcher()
@@ -963,12 +989,16 @@ class GUI:
         # Update the track drawing (if exists) only on frame change or settings change
         self.draw_track()
 
-    def update_distance(self, line_id: int):
+    def update_distance(self, line_id: int, draw_text: bool):
         '''
         Update the distance text based on the given distance.
         '''
-        if self.distance_text_id:
-            self.graph.delete_figure(self.distance_text_id)
+        if line_id in self.distance_text_id:
+            self.graph.delete_figure(self.distance_text_id[line_id])
+            self.distance_text_id.pop(line_id)
+
+        if not draw_text:
+            return
 
         distance_from_line = 15
 
@@ -994,7 +1024,7 @@ class GUI:
 
         text_pt = (mid_point - distance_from_line * right_perpendicular).tolist()
 
-        self.distance_text_id = self.graph.draw_text(measurment_text, text_pt, color='white',
+        self.distance_text_id[line_id] = self.graph.draw_text(measurment_text, text_pt, color='white',
                                                             font='_ 18', text_location=text_location)
 
     def enable_toolbox(self):
@@ -1006,6 +1036,7 @@ class GUI:
         self.window['-ERASE-'].update(disabled=False)
         self.window['-CLEAR-'].update(disabled=False)
         self.window['-DIS UNITS-'].update(disabled=False)
+        self.window['-SHOW DIS-'].update(disabled=False)
 
     def calibration_toolbox(self):
         '''
@@ -1075,7 +1106,7 @@ class GUI:
             self.EdgeCircles[circle2_id] = circle2
             # print(self.EdgeCircles)
 
-        self.update_distance(line_id)
+        self.update_distance(line_id, True)
 
 
 
@@ -1532,6 +1563,8 @@ def make_window2() -> sg.Window:
            [sg.R('Select and Edit Line', 1, k='-SELECT-', enable_events=True, font=('Helvetica', 16), disabled=True)],
            [sg.R('Erase Item', 1, k='-ERASE-', enable_events=True, font=('Helvetica', 16), disabled=True)],
            [sg.R('Erase All', 1, k='-CLEAR-', enable_events=True, font=('Helvetica', 16), disabled=True)],
+           [sg.VPush()],
+           [sg.Checkbox('Show All Distances', disabled=True, k='-SHOW DIS-', enable_events=True, font='_ 16')],
            [sg.VPush()],
            [sg.Combo(['Meters', 'Feet and Inches'], default_value='Meters', readonly=True, k='-DIS UNITS-',
                         enable_events=True, tooltip='Distance Units', font='_ 16', disabled=True)],
