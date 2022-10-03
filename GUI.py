@@ -195,7 +195,6 @@ class GUI:
                 self.graph.bind('<Motion>', '+MOVE+')
                 self.graph.bind('<ButtonRelease-1>', '+UP+')
                 self.graph.bind('<ButtonPress-1>', '+DOWN+')
-                self.graph.bind('<Shift-1>', '+SHIFT+')
 
                 self.slider = self.window['-SLIDER-']
                 self.counter = self.window['-COUNTER-']
@@ -223,8 +222,8 @@ class GUI:
                 # Set new graph size
                 self.graph_width = self.window.get_screen_size()[0]
                 self.graph_height = int(self.graph_width * self.pano_height / self.pano_width)
-                if self.graph_height > self.window.get_screen_size()[1] / 2:
-                    self.graph_height = self.window.get_screen_size()[1] // 2
+                if self.graph_height > self.window.get_screen_size()[1] * 12/25:
+                    self.graph_height = self.window.get_screen_size()[1] * 12//25
                     self.graph_width = int(self.graph_height * self.pano_width / self.pano_height)
 
                 self.graph.set_size((self.graph_width, self.graph_height))
@@ -617,7 +616,7 @@ class GUI:
                             self.Lines.pop(self.last_figure)
                             self.graph.delete_figure(self.last_figure)
                             self.last_figure = None
-                            
+
                             if self.distance_text_id:
                                 self.graph.delete_figure(self.distance_text_id)
                                 self.distance_text_id = None
@@ -996,7 +995,7 @@ class GUI:
         text_pt = (mid_point - distance_from_line * right_perpendicular).tolist()
 
         self.distance_text_id = self.graph.draw_text(measurment_text, text_pt, color='white',
-                                                        font='_ 18', text_location=text_location)
+                                                            font='_ 18', text_location=text_location)
 
     def enable_toolbox(self):
         '''
@@ -1462,15 +1461,15 @@ def expert_mode_window(stitcher: Stitcher, min_num: int, max_num:int, f: int):
     '''
     A window to chagne the stitcher's parameters.
     '''
-    layout = [[sg.Text('min_match_num', size=(15,1)), sg.Input(default_text=f'{min_num}', size=(8,1), k='-MIN-', enable_events=True),
-               sg.Text('?', size=(1,1), tooltip='Controls the minimum amount of overlap between\nstitched frames of the panorama.\nThe smaller min_match_num is, the lesser the overlap.\nIT\'S BETTER TO TINKER WITH max_match_num!')],
-              [sg.Text('max_match_num', size=(15,1)), sg.Input(default_text=f'{max_num}', size=(8,1), k='-MAX-', enable_events=True),
-               sg.Text('?', size=(1,1), tooltip='Controls the maximum amount of overlap between\nstitched frames of the panorama.\nThe larger max_match_num is, the greater the overlap.')],
-              [sg.Text('f', size=(15,1)), sg.Input(default_text=f'{f}', size=(8,1), k='-F-', enable_events=True),
-               sg.Text('?', size=(1,1), tooltip='Controls the focal point of the panorama.\nThe smaller f, the greater the curvature of the panorama.\nRule of Thumb: The greater the angle the camera pans,\nthe smaller f should be, and vice versa.')],
-              [sg.Text('resize_factor', size=(15,1)), sg.Spin([1,2,3,4,5], initial_value=stitcher.get_resize_factor(), size=(4,1), k='-RESIZE-', enable_events=True, readonly=True, background_color='white'),
-               sg.Text('?', size=(1,1), tooltip='Controls the amount by which the quality decreases.\nBest for debuging and perfecting the\nappropriate parameters for a given video.')],
-              [sg.B('Save')]]
+    layout = [[sg.Text('min_match_num', size=(15,1), font='_ 14'), sg.Input(default_text=f'{min_num}', size=(8,1), k='-MIN-', enable_events=True, font='_ 14'),
+               sg.Text('?', font='_ 14', size=(1,1), tooltip='Controls the minimum amount of overlap between\nstitched frames of the panorama.\nThe smaller min_match_num is, the lesser the overlap.\nIT\'S BETTER TO TINKER WITH max_match_num!')],
+              [sg.Text('max_match_num', size=(15,1), font='_ 14'), sg.Input(default_text=f'{max_num}', size=(8,1), k='-MAX-', enable_events=True, font='_ 14'),
+               sg.Text('?', font='_ 14', size=(1,1), tooltip='Controls the maximum amount of overlap between\nstitched frames of the panorama.\nThe larger max_match_num is, the greater the overlap.')],
+              [sg.Text('f', size=(15,1), font='_ 14'), sg.Input(default_text=f'{f}', size=(8,1), k='-F-', enable_events=True, font='_ 14'),
+               sg.Text('?', font='_ 14', size=(1,1), tooltip='Controls the focal point of the panorama.\nThe smaller f, the greater the curvature of the panorama.\nRule of Thumb: The greater the angle the camera pans,\nthe smaller f should be, and vice versa.')],
+              [sg.Text('resize_factor', size=(15,1), font='_ 14'), sg.Spin([1,2,3,4,5], initial_value=stitcher.get_resize_factor(), size=(4,1), k='-RESIZE-', enable_events=True, readonly=True, background_color='white', font='_ 14'),
+               sg.Text('?', font='_ 14', size=(1,1), tooltip='Controls the amount by which the quality decreases.\nBest for debuging and perfecting the\nappropriate parameters for a given video.')],
+              [sg.B('Save', font='_ 14')]]
 
     window = sg.Window('Expert Mode', layout, text_justification='c', finalize=True, resizable=True)
 
@@ -1512,10 +1511,10 @@ def make_window1() -> sg.Window:
     '''
     Make window1 of browsing.
     '''
-    col = [[sg.Push(), sg.Text(s=(4,1)), sg.Text('Select video', font='_ 16'), sg.Push(), sg.vtop(sg.B('More'))],
+    col = [[sg.Push(), sg.Text(s=(4,1)), sg.Text('Select video', font='_ 16'), sg.Push(), sg.vtop(sg.B('More', font='_ 14'))],
            [sg.Text(font='_ 14', text='Please upload as short a video as you can.')],
            [sg.Text('Also pretty please, make sure the video is shot with minimal vertical movement (or else the algorithm freaks).', font='_ 14')],
-           [sg.In(key="-FILEPATH-", enable_events=True), sg.FileBrowse("Browse", font='_ 14')],
+           [sg.In(key="-FILEPATH-", enable_events=True, font='_ 14'), sg.FileBrowse("Browse", font='_ 14')],
            [sg.B('Exit', k='-EXIT-', font='_ 14')]]
 
     layout = [[sg.Text(expand_x=True, expand_y=True, font='ANY 1', pad=(0, 0))],  # the thing that expands from top
@@ -1559,7 +1558,7 @@ def make_window2() -> sg.Window:
                     graph_top_right=(200,0), background_color="light grey")
                 ]]
 
-    layout = [[sg.vtop(sg.B('Help')), sg.Push(),
+    layout = [[sg.vtop(sg.B('Help', font='_ 12')), sg.Push(),
                sg.Frame('Help Text',
                         [[sg.Text('Please Track Object or Calibrate Distance.', font='_ 16',
                             k='-TEXT-', background_color='red', justification='c', expand_x=True)]],
@@ -1574,9 +1573,9 @@ def make_window2() -> sg.Window:
                 sg.Push()
               ],
               [sg.Push(), sg.Frame('Playback Controls',
-                    [[sg.B("Previous Frame", key="-P FRAME-", tooltip='[LEFT KEY]\n<-'),
-                    sg.B("Play", key="-PLAY-", tooltip='[SPACE]'),
-                    sg.B("Next Frame", key="-N FRAME-", tooltip='[RIGHT KEY]\n->'),
+                    [[sg.B("Previous Frame", key="-P FRAME-", tooltip='[LEFT KEY]\n<-', font='_ 14'),
+                    sg.B("Play", key="-PLAY-", tooltip='[SPACE]', font='_ 14'),
+                    sg.B("Next Frame", key="-N FRAME-", tooltip='[RIGHT KEY]\n->', font='_ 14'),
                     sg.Slider(range=(0, 100), k="-SLIDER-", orientation="h",
                                 enable_events=True, expand_x=True, disable_number_display=True, tooltip='1'),
                     sg.Text("0/0", k="-COUNTER-", font='_ 14')]], font='_ 14', title_location=sg.TITLE_LOCATION_TOP,
@@ -1593,7 +1592,7 @@ def make_window2() -> sg.Window:
                sg.Push(),
                sg.Frame('Magnifier', magnifier, font='_ 16'),
                sg.Push()],
-              [sg.B('Back'), sg.Push(), sg.B('Exit')]]
+              [sg.B('Back', font='_ 12'), sg.Push(), sg.B('Exit', font='_ 12')]]
 
     return sg.Window("Panoramic Video Stitching", layout=layout, finalize=True, resizable=True, element_justification='c')
 
@@ -1604,9 +1603,9 @@ def popup_get_distance() -> Tuple[Union[float, None], str]:
     value = -1
     distance_units = ''
 
-    layout = [[sg.Text('Please provide the distance of the drawn line as you know it', auto_size_text=True)],
+    layout = [[sg.Text('Please provide the distance of the drawn line as you know it', auto_size_text=True, font='_ 14')],
                [sg.InputText(key='-IN-', enable_events=True, default_text='0[.0]', text_color='gray', focus=False),
-                sg.Combo(['Meters', 'Feet and Inches'], default_value='Meters', k='-UNITS-', enable_events=True, readonly=True)
+                sg.Combo(['Meters', 'Feet and Inches'], default_value='Meters', k='-UNITS-', enable_events=True, readonly=True, font='_ 14')
               ],
                [sg.Button('Ok', size=(6, 1), bind_return_key=True, focus=True), sg.Button('Cancel', size=(6, 1), bind_return_key=True)]]
 
