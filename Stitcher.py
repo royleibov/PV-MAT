@@ -4,20 +4,14 @@ Stitch together a panorama from a given video [input]
 
 #TODO: remove all os filepath manipulations - savings and stuff
 
-import argparse
 import os
-from typing import Tuple, overload, Union
+from typing import Tuple, Union
 import cv2
 import numpy as np
 import time
 import glob
 
 import PySimpleGUI as sg
-
-from OpenGL.GL import *
-from OpenGL.GLU import *
-from OpenGL.GLUT import *
-from OGLVideoView import OGLVideoView
 
 class Stitcher(object):
     '''

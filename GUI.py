@@ -1575,6 +1575,11 @@ and object detection are \"hot\" fields in machine learning, with many new, bigg
 I could have chosen a more accurate or even faster algorithm for tracking but chose to stay with the one I view as best among \
 OpenCV's catalog. Improving the tracking experience can greatly improve the usefulness of my program.
 
+5. User experience - I believe a great deal that a good, concise, and understandable UI will lead to good UX. I can add in the \
+future the ability to opt-out of waiting all the way through while stitching the panorama or tracking an object. Right now trying \
+to close the progressbars does nothing, because I found it too difficult at the moment to implement a stopping mechanism on \
+seperate threads. 
+
 Lastly, the experience of working with PySimpleGUI, a beautifully built, maintained, and documented library for GUI making, \
 was exquisite. Dipping my feet in the word of program-making proved to be not as daunting as I thought thanks to \
 PySimpleGUI's though provoking community. I'm sure I will build many more programs and project thanks to this smooth experience."""
@@ -1708,7 +1713,8 @@ def make_window1() -> sg.Window:
            ],
            [sg.Text(font='_ 14', text='Please upload as short a video as you can.')],
            [sg.Text('Also pretty please, make sure the video is shot with minimal vertical movement (or else the algorithm freaks).', font='_ 14')],
-           [sg.In(key="-FILEPATH-", enable_events=True, font='_ 14'), sg.FileBrowse("Browse", font='_ 14')],
+           [sg.In(key="-FILEPATH-", enable_events=True, font='_ 14'),
+            sg.FileBrowse("Browse", font='_ 14', file_types=(('All Video Files', '*.mp4 *.mov *.mkv *.avi *.wmv'),))],
            [sg.B('Exit', k='-EXIT-', font='_ 14')]]
 
     layout = [[sg.Text(expand_x=True, expand_y=True, font='ANY 1', pad=(0, 0))],  # the thing that expands from top
