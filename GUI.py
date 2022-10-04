@@ -224,7 +224,7 @@ class GUI:
 
                 # Display the panorama
                 self.pano_height, self.pano_width = self.panorama.shape[:2]
-                print(self.pano_width, self.pano_height)
+                # print(self.pano_width, self.pano_height)
 
                 # Set new graph size
                 self.graph_width = self.window.get_screen_size()[0]
@@ -325,7 +325,7 @@ class GUI:
 
                 bbox = cv2.selectROI('Select Region of Interest', frame, True)
 
-                print(f'bbox: {bbox} 0')
+                # print(f'bbox: {bbox} 0')
                 cv2.destroyAllWindows()
 
                 if bbox == (0, 0, 0, 0):
@@ -600,7 +600,7 @@ class GUI:
 
             # Finished drawing or dragging
             if event == '-GRAPH-+UP+':
-                print('up')
+                # print('up')
                 # Handle calibration
                 if self.calibrating and self.pixel_dist > 0:
                     self.calibrating = False
@@ -731,7 +731,7 @@ class GUI:
 
                     # Drag item
                     if values['-SELECT-']:
-                        print('drag')
+                        # print('drag')
 
                         for fig in figures:
                             # Handle resizing of line
@@ -802,12 +802,12 @@ class GUI:
 
                     # Erase item
                     if values['-ERASE-']:
-                        print('erase')
+                        # print('erase')
 
                         for fig in figures:
                             if fig in self.Lines:
-                                print(fig)
-                                print(self.Lines[fig])
+                                # print(fig)
+                                # print(self.Lines[fig])
                                 self.Lines.pop(fig)
                                 self.graph.delete_figure(fig)
 
@@ -820,7 +820,7 @@ class GUI:
 
                     # Erase all items
                     if values['-CLEAR-']:
-                        print('clear')
+                        # print('clear')
                         self.graph.erase()
                         del self.Lines
                         self.Lines = {}
@@ -836,6 +836,9 @@ class GUI:
             if event == '-CALIB-':
                 # Not currently in calibration mode
                 if not self.calibrating:
+                    if self.last_figure in self.distance_text_id:
+                        self.update_distance(self.last_figure, self.draw_distance_text)
+
                     self.calibrating = True
                     self.window['-CALIB-'].update(button_color=('#283b5b', 'white'))
                     self.text.update('Entered calibration mode! Drag or Select a line of a known distance.', background_color='red')
@@ -871,7 +874,7 @@ class GUI:
                 self.text.update('Draw a line by dragging on the image.')
             
             if event == '-SELECT-':
-                if self.last_figure:
+                if self.last_figure and not self.calibrating:
                     self.select_and_move(self.last_figure, (0,0))
                 elif self.last_figure in self.distance_text_id:
                     self.graph.delete_figure(self.distance_text_id[self.last_figure])
@@ -1198,8 +1201,8 @@ class GUI:
                 # Middile point of bbox
                 mid_point = (int((p1[0] + p2[0]) / 2) , int((p1[1] + p2[1]) / 2))
 
-                print(f'Found ROI {i}: {p1}, {p2}')
-                print(f'bbox: {bbox} {i}')
+                # print(f'Found ROI {i}: {p1}, {p2}')
+                # print(f'bbox: {bbox} {i}')
 
                 # Svae the points
                 self.bounding_boxes.append((p1, p2))
@@ -1210,8 +1213,8 @@ class GUI:
                     self.COM_path.append([mid_point])
 
             else: # Couldn't find the tracked object
-                print(f'Tracking failure detected {i}')
-                print(f'bbox: {bbox} {i}')
+                # print(f'Tracking failure detected {i}')
+                # print(f'bbox: {bbox} {i}')
 
                 # Save filler points
                 self.bounding_boxes.append((-1, -1))
@@ -1226,7 +1229,7 @@ class GUI:
 
         # Activate features after tracker is done
         self.window.write_event_value('-TRACKER DONE-', None)
-        print('Done!')
+        # print('Done!')
 
 
     def calculate_velocity(self):
@@ -1283,7 +1286,7 @@ class GUI:
             self.velocities.append(avg_velocity)
         
         self.velocities.append(0.0)
-        print(self.velocities)
+        # print(self.velocities)
 
 
     # --- GUI draw functions --- #
@@ -1334,10 +1337,10 @@ class GUI:
                 assert self.calibration_ratio > 0, "Problem calculating velocities with no distance calibration"
                 assert self.vel_units_ratio > 0, "Problem calculating velocities with no velocity units calibration"
 
-                print(f'In frame {self.current_frame_num}, vel in {self.distance_units}/sec: {self.velocities[self.current_frame_num - 1] * self.calibration_ratio}')
+                # print(f'In frame {self.current_frame_num}, vel in {self.distance_units}/sec: {self.velocities[self.current_frame_num - 1] * self.calibration_ratio}')
                 # Convert px/sec to self.velocity_units units
                 velocity = self.velocities[self.current_frame_num - 1] * self.calibration_ratio * self.vel_units_ratio
-                print(f'vel in {self.velocity_units}: {velocity}')
+                # print(f'vel in {self.velocity_units}: {velocity}')
 
                 # Print text to screen
                 velocity_text = f'Vel: {velocity:.3} {self.velocity_units}'
@@ -1481,8 +1484,11 @@ closing out of everything (using the Exit button on the main window) and loading
 """Note that (if I'm being harsh on myself) even a perfect measurement is ±1% off.
 With that in mind, there's probably a mistake in one or more of 3 points of failure:
 
-1. The panorama was built incorrectly (Oops my bad) - I tried to write the most efficient code to build the panorama from just the \
-video, with no information about the camera. That's A LOT of math and it's possible I made a mistake somewhere.
+1. The panorama was built incorrectly - I tried to write the most efficient code to build the panorama from just the \
+video, with no information about the camera. That's A LOT of math and it's possible I made a mistake somewhere. But take \
+into consideration that if the plane of interest (the plane in 3D space where measurements are to be made) changes as \
+the object is moving, either towards or away from the camera, any calibration won't be sufficient. The App does not know \
+how to deal well with depth.
 
 2. There was a mistake in the calibration - Any 2-3 pixels mistake in the line drawn can be quite noticeable \
 in the measurement. Do as best you can to place the calibration line correctly. You can even edit a drawn line and select it \
@@ -1522,17 +1528,17 @@ heavily looked on and exterminated so think long and hard before you take upon y
 to mentally deal with its bugs.
 With that out of the way, to open Expert Mode all you need to do is press SHIFT while at the starting window and \
 the 'Help' button should magically transform into a 'More' button. Press on it to invoke Expert Mode. Press SHIFT again to \
-revert to 'Help'.
+revert back to 'Help'.
 
 If you weren't deterred by my attempt to frighten you and want to learn how to use Expert Mode (apart from the helpful tooltips \
 found when hovering over the question marks (?)) here's the guide:
 
 When the stitching algorithm chooses which frames in the video to stitch together, it does so in a way that minimizes \
 the overlapping area between consecutive frames as much as possible. By comparing the matched area (in number of identical \
-key-points between two frames), it chooses frames which fit between 'min_math_num' and 'max_match_num'.
+key-points between two frames), it chooses frames which fit between 'min_match_num' and 'max_match_num'.
 
 min_match_num - Minimum number of matching key-points between the frames for a frame to be chosen for stitching. I would suggest NOT \
-changing it and tinkering with 'max_match_num' instead. If you must change it, I wouldn't suggest going below 20.
+changing it and tinkering with 'max_match_num' instead. If you must change it, I would suggest NOT going below 20.
 
 max_match_num - Maximum number of matching key-points between the frames for a frame to be chosen for stitching. The smaller this \
 variable, the lesser the overlap between frames chosen for stitching, and the fewer frames will be stitched (which improves \
@@ -1540,7 +1546,7 @@ loading time).
 
 focal length (f) - Put simply, the closer you are to the plane of interest the smaller f should be. Literally, it's the radius of \
 the circle the camera sweeps when you pan, or a combination of it and the distance of the camera from the plane (in 3D) \
-you're interested in. In function you can think of it as the measurement of how curved the frames in the video should be. \
+you're interested in. Practically, you can think of it as the measurement of how curved the frames in the video should be. \
 The smaller f the curvier the frames are, and the closer you are to the plane of interest or bigger the angle the camera sweeps.
 
 resize_factor - The number to divide the video's resolution by. Very useful in cases where you want to load a video fast to tinker \
@@ -1578,11 +1584,11 @@ OpenCV's catalog. Improving the tracking experience can greatly improve the usef
 5. User experience - I believe a great deal that a good, concise, and understandable UI will lead to good UX. I can add in the \
 future the ability to opt-out of waiting all the way through while stitching the panorama or tracking an object. Right now trying \
 to close the progressbars does nothing, because I found it too difficult at the moment to implement a stopping mechanism on \
-seperate threads. 
+seperate threads.
 
 Lastly, the experience of working with PySimpleGUI, a beautifully built, maintained, and documented library for GUI making, \
 was exquisite. Dipping my feet in the word of program-making proved to be not as daunting as I thought thanks to \
-PySimpleGUI's though provoking community. I'm sure I will build many more programs and project thanks to this smooth experience."""
+PySimpleGUI community's guidence. I'm sure I will build many more programs and projects thanks to this smooth experience."""
     layout = [
                 [sg.T('Goals', font=heading_font, pad=(0,10))],
                 [HelpText(help_why)],
@@ -1600,11 +1606,11 @@ PySimpleGUI's though provoking community. I'm sure I will build many more progra
                 [sg.pin(HelpText(q3_answer, visible=False, key='-A3-'))],
                 [HelpText(end_faq)],
                 [sg.HorizontalSeparator(p=20)],
-                [QuestionText(RIGHT_ARROW, key='-Q4-', font=heading_font), # Key to utilize collapsable feature
+                [QuestionText(RIGHT_ARROW, key='-Q4-', font=heading_font[:-10]), # Key to utilize collapsable feature
                  sg.T('Expert Mode (optional)', font=heading_font, pad=(0,10), key='-Q4-TEXT', enable_events=True)], # Key to utilize collapsable feature
                 [sg.pin(HelpText(help_expert_mode, visible=False, key='-A4-'))], # Key to utilize collapsable feature
                 [sg.HorizontalSeparator(p=20)],
-                [QuestionText(RIGHT_ARROW, key='-Q5-', font=heading_font), # Key to utilize collapsable feature
+                [QuestionText(RIGHT_ARROW, key='-Q5-', font=heading_font[:-10]), # Key to utilize collapsable feature
                  sg.T('Points for Thought', font=heading_font, pad=(0,10), key='-Q5-TEXT', enable_events=True)],
                 [sg.pin(HelpText(points_to_improve, visible=False, key='-A5-'))]
               ]
@@ -1689,7 +1695,7 @@ def make_tracking_window():
     Make the tracking explaination window popup.
     '''
     layout = [[sg.Text('Track Object', font='_ 16')],
-              [sg.Text('Select by dragging a rectangle on the image.', font='_ 14')],
+              [sg.Text('Select an object by dragging a rectangle on the image.', font='_ 14')],
               [sg.Text('To begin tracking, press the ENTER or SPACE keys on your keyboard.', font='_ 14')],
               [sg.Text('To cancel the tracking, press the C letter key on your keyboard.', font='_ 14')],
               [sg.B('Next', font='_ 14', k='-NEXT-')]]
