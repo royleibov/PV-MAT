@@ -27,6 +27,8 @@ class GUI:
         '''
         # Setting up the GUI
         self.window = make_window1()
+        self.window.bind('<Shift-KeyPress>', '+SHIFT DOWN+')
+        self.show_help = True
 
         # To be set after 2nd window is loaded
         self.graph: sg.Graph = None
@@ -47,10 +49,10 @@ class GUI:
         self.magnify_id = None # ID of image in magnify object
         self.cross_id = None # ID of cross in magnify object
         self.magnify_width = self.magnify_height = None # Set later
-        self.magnify_square_id = None # ID of magnifing square size visualizaion
+        self.magnify_square_id = None # ID of magnifying square size visualizaion
         self.cursor = 'arrow'
 
-        # Measurments
+        # Measurements
         self.distance_units = 'px' # Units of distance
         self.dragging = False # True if there's a drag on the graph
         self.start_point = self.end_point = None # Items start and end
@@ -106,7 +108,7 @@ class GUI:
             # print(event, values)
 
             # Entered expert mode
-            if event == 'More':
+            if event == '-EXPERT-':
                 expert_mode_window(self.stitcher, self.min_match_num, self.max_match_num, self.f)
 
                 if self.stitcher.get_resize_factor() == 1:
@@ -115,8 +117,14 @@ class GUI:
                     self.f = self.stitcher.f
         
             # Handle help
-            if event == 'Help':
+            if event == '-HELP-':
                 help_window()
+
+            if event == '+SHIFT DOWN+':
+                self.show_help = not self.show_help
+                self.window['-HELP-'].update(visible=self.show_help)
+                self.window['-EXPERT-'].update(visible=not self.show_help)
+                self.window['-SIZER-'].set_size(size=(6,1) if self.show_help else (7,1))
 
             # Pick file and set variables by it
             if event == "-FILEPATH-":
@@ -309,13 +317,13 @@ class GUI:
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
                 # Taken from https://broutonlab.com/blog/opencv-object-tracking
                 # Select the bounding box in the first frame
-                cv2.namedWindow('Select Reigon of Interest')
+                cv2.namedWindow('Select Region of Interest')
                 window_width, window_height = sg.Window.get_screen_size()
                 move_height = (window_height - self.pano_height) // 2
                 move_width = (window_width - self.pano_width) // 2
-                cv2.moveWindow('Select Reigon of Interest', move_width, move_height)
+                cv2.moveWindow('Select Region of Interest', move_width, move_height)
 
-                bbox = cv2.selectROI('Select Reigon of Interest', frame, True)
+                bbox = cv2.selectROI('Select Region of Interest', frame, True)
 
                 print(f'bbox: {bbox} 0')
                 cv2.destroyAllWindows()
@@ -511,7 +519,7 @@ class GUI:
             # Actually triggered most of the time with '+MOVE+'
             if event.startswith('-GRAPH-'):
                 # print('Moving!')
-                # Set the magnifing square window: (magnify_size, magnify_size)
+                # Set the magnifying square window: (magnify_size, magnify_size)
                 magnify_size = values['-MAGNIFY SIZE-']
 
                 x, y = values['-GRAPH-']
@@ -658,7 +666,7 @@ class GUI:
                             self.cursor = 'cross'
                             self.graph.set_cursor(self.cursor)
 
-                            self.text.update('Please make a measurment by dragging a line!', background_color=sg.theme_text_element_background_color())
+                            self.text.update('Please make a measurement by dragging a line!', background_color=sg.theme_text_element_background_color())
                             self.text.current_background = sg.theme_text_element_background_color()
 
                             self.distance_units = values['-DIS UNITS-']
@@ -842,7 +850,7 @@ class GUI:
                         self.enable_toolbox()
                         self.calibrating = False
                         self.window['-CALIB-'].update(button_color=('white', '#283b5b'))
-                        self.text.update('Please make a measurment by dragging a line!', background_color=sg.theme_text_element_background_color())
+                        self.text.update('Please make a measurement by dragging a line!', background_color=sg.theme_text_element_background_color())
                         self.text.current_background = sg.theme_text_element_background_color()
                         self.distance_units = values['-DIS UNITS-']
                     else: # No calibration was ever done
@@ -909,6 +917,8 @@ class GUI:
                 self.window.close()
                 del self.window
                 self.window = make_window1()
+                self.window.bind('<Shift-KeyPress>', '+SHIFT DOWN+')
+                self.show_help = True
 
                 del self.stitcher
                 self.stitcher = Stitcher(self.window, self.max_match_num, self.f)
@@ -923,7 +933,7 @@ class GUI:
                 self.current_frame_num = 1
                 self.magnify_id = None
                 self.cross_id = None
-                self.magnify_square_id = None # ID of magnifing square size visualizaion
+                self.magnify_square_id = None # ID of magnifying square size visualizaion
                 self.cursor = 'arrow'
                 self.distance_units = 'px' # Units of distance
                 self.dragging = False # True if there's a drag on the graph
@@ -1014,8 +1024,8 @@ class GUI:
 
         a, b, pixel_distance = self.Lines[line_id]
 
-        measurment = pixel_distance * self.calibration_ratio if not self.calibrating else pixel_distance
-        measurment_text = convert_to_units(measurment, self.distance_units)
+        measurement = pixel_distance * self.calibration_ratio if not self.calibrating else pixel_distance
+        measurement_text = convert_to_units(measurement, self.distance_units)
 
         a = np.array(a)
         b = np.array(b)
@@ -1034,7 +1044,7 @@ class GUI:
 
         text_pt = (mid_point - distance_from_line * right_perpendicular).tolist()
 
-        self.distance_text_id[line_id] = self.graph.draw_text(measurment_text, text_pt, color='white',
+        self.distance_text_id[line_id] = self.graph.draw_text(measurement_text, text_pt, color='white',
                                                             font='_ 18', text_location=text_location)
 
     def enable_toolbox(self):
@@ -1426,75 +1436,196 @@ def help_window():
     '''
     Initalize the help window.
     '''
-    heading_font = '_ 12 bold underline'
-    text_font = '_ 10'
+    heading_font = '_ 20 bold underline'
+    text_font = '_ 16'
+    question_font = '_ 18'
 
-    def HelpText(text):
-        return sg.Text(text, size=(80, None), font=text_font)
+    RIGHT_ARROW = '▶ '
+    DOWN_ARROW = '▼ '
+
+    def HelpText(text, visible=True, key=None) -> sg.Text:
+        return sg.Text(text, size=(80, None), font=text_font, visible=visible, key=key)
+
+    def QuestionText(text, key, font=question_font) -> sg.Text:
+        return sg.T(text, key=key, font=font, pad=(0,10), enable_events=True)
 
     help_why = \
-""" Let's start with a review of the Goals of the PanoramicVideoStitching project (a.g the App)
-1. To learn more
+"""Let's start with a review of the Goals of the PanoramicVideoStitching project (the App):
+1. To learn more and analyze all the things
 2. For you to be successful
 
-This App solves a neccesity that came up in training, but could be expanded to many disciplines.
+This App solves a necessity that came up in training, but could be expanded to anything involving a video and some movement.
 
-The App is here to help you improve your understanding of movement (and solve some debates). """
+Given the restrictions put forth in the starting window (a video as short as possible and camera movement constrained to one axis \
+- Up<->Down, Left<->Right, etc.) I believe this App can be very powerful!"""
 
-    help_goals = \
-""" The goals of using this App are:
-* Give you a better look of the subject's (athlete's) movement through space.
-* Measure distances the athlete does.
-* (?) Follow the subject's path through space.
-* (?) Know the subject's speed and acceleration.
-* (?) Know the force applied to the subject."""
+    help_faq = \
+"""If you have followed the restrictions and still are experiencing problems try and find a solution here:"""
 
-    help_explain = \
-""" The most obvious questions about this App's behavior
-Q:  Why is my measurment trash?
+    q1_answer = \
+"""There are a plethora of problems that can arise in the panorama-making step, but a few you can solve are:
 
-A:  First of all ouch... (just note that even a perfect measurment is ±1% off)
-    The short answer - There was a screw up somewhere.
+1. Progressbar is stuck on some step of \"Stitching panorama's _ side (#)/(All #)\" - If the number in (All #) is sufficiently big \
+(say 12 and above, but it's not an exact science) the video provided might have been too long for your computer to handle \
+with the current way the algorithm is programmed. If not, you should consider learning to tinker with the stitching algorithm using Expert \
+Mode (instructions below).
 
-    The longer answer - There are mainly 3 points of possible failiure:
-    1. The panorama was built incorrectly (Oops my bad): I tried to write the most efficient code to build the panorama from just the video, with no information about the camera. That's A LOT of math and it's possible I made a mistake somewhere.
+2. The frames are being processed REALLY slowly - Either the video is too massive, and you should consider learning to tinker \
+with 'resize_factor' in Expert Mode (instructions below), or the focal_length (f) is too small for the given video, and you again need \
+to tinker with it in Expert Mode.
 
-    2. There was a mistake in the calibration (just recalibrate): Any 2-3 pixels mistake in the line drawn can be quite noticable in the measurment. Do as best you can to place the calibration line correctly.
+3. The progressbar is stuck in some other phase - The program probably got stuck somewhere and takes long to load, I would consider \
+closing out of everything (using the Exit button on the main window) and loading the video again."""
 
-    3. There was a mistake in the measurment line (try and correct it): Again, 2-3 pixels off could be a huge diffrence.
+    q2_answer = \
+"""Note that (if I'm being harsh on myself) even a perfect measurement is ±1% off.
+With that in mind, there's probably a mistake in one or more of 3 points of failure:
 
-    As you can imagine, no one mistake happens alone most the time, and those mistakes add up.
+1. The panorama was built incorrectly (Oops my bad) - I tried to write the most efficient code to build the panorama from just the \
+video, with no information about the camera. That's A LOT of math and it's possible I made a mistake somewhere.
 
-    So take all the measurments with a grain of salt. The App can gurentee you PB'd but it can help you learn much more about your technique.
+2. There was a mistake in the calibration - Any 2-3 pixels mistake in the line drawn can be quite noticeable \
+in the measurement. Do as best you can to place the calibration line correctly. You can even edit a drawn line and select it \
+as the calibration line.
 
-Q:  The video is taking ages to load, I think you messed something up.
+3. There was a mistake in the measurement line - Again, 2-3 pixels off could be a huge difference. Try to adjust it by utilizing \
+the Magnifying Area (hint: you can zoom in by dragging the slider next to it).
 
-A:  Technically not a question but I'll allow it.
-    There are 2 possibilities: either the video is too long or it isn't shot with strictly vertical movement.
+As you can imagine, no one mistake happens alone most of the time, and those mistakes add up. So take all the \
+measurements with a grain of salt."""
 
-    I won't get into details but the panorama-making algorithm assumes the video pretty much strictly and smoothly pans across a scene. Bascially if the cameraman jumps up and down with excitment the algorithm freaks out."""
+    q3_answer = \
+"""I had the choice of either sacrificing space, both in disk and on memory, or speed and accuracy. I chose to cherish \
+the space the App takes and to get by with less \"expensive\" tracking algorithms.
 
-    help_experience = \
-""" I plan on adding some tinkering options for the more computer inclined folks out there."""
-    help_steps = \
-""" If there's any other problems that arise while using The App please let me know. Any small unexpected bahavior will be heavily looked on and exterminated so think long and hard before you take upon yourself the death of a bug. """
+Though the tracking algorithm doesn't utilize deep learning, and so is less accurate, it is still reliable enough to deal \
+with most tracking situations. Most of the time, all you need to do is persistently rechoose slightly different Regions of \
+Interest (ROIs) until you arrive at a satisfactory result.
+
+Tips and Tricks:
+1. The better the video's resolution the easier it will be for the tracker to do its job. So consider working with videos with \
+higher resolutions (that haven't gone through any compression in WhatsApp or the like). Also consider to lower the 'resize_factor' \
+if you have tinkered with Expert Mode.
+
+2. Choose high-contrast areas as ROIs. Try and select different areas of the object you are tracking and not just slightly \
+readjust the rectangle. I found that for people, mainly those who are far away, tracking their head gives better results \
+then tracking their entire body.
+
+For the limitations of the tracking algorithm, see 'Points for Thought' below."""
+
+    end_faq = \
+"""If there's any other problems that arise while using the App please let me know. Any small unexpected behavior will be \
+heavily looked on and exterminated so think long and hard before you take upon yourself the death of a bug."""
+
+    help_expert_mode = \
+"""You should invoke Expert Mode if you are familiar with panorama stitching or believe you are tech savvy enough \
+to mentally deal with its bugs.
+With that out of the way, to open Expert Mode all you need to do is press SHIFT while at the starting window and \
+the 'Help' button should magically transform into a 'More' button. Press on it to invoke Expert Mode. Press SHIFT again to \
+revert to 'Help'.
+
+If you weren't deterred by my attempt to frighten you and want to learn how to use Expert Mode (apart from the helpful tooltips \
+found when hovering over the question marks (?)) here's the guide:
+
+When the stitching algorithm chooses which frames in the video to stitch together, it does so in a way that minimizes \
+the overlapping area between consecutive frames as much as possible. By comparing the matched area (in number of identical \
+key-points between two frames), it chooses frames which fit between 'min_math_num' and 'max_match_num'.
+
+min_match_num - Minimum number of matching key-points between the frames for a frame to be chosen for stitching. I would suggest NOT \
+changing it and tinkering with 'max_match_num' instead. If you must change it, I wouldn't suggest going below 20.
+
+max_match_num - Maximum number of matching key-points between the frames for a frame to be chosen for stitching. The smaller this \
+variable, the lesser the overlap between frames chosen for stitching, and the fewer frames will be stitched (which improves \
+loading time).
+
+focal length (f) - Put simply, the closer you are to the plane of interest the smaller f should be. Literally, it's the radius of \
+the circle the camera sweeps when you pan, or a combination of it and the distance of the camera from the plane (in 3D) \
+you're interested in. In function you can think of it as the measurement of how curved the frames in the video should be. \
+The smaller f the curvier the frames are, and the closer you are to the plane of interest or bigger the angle the camera sweeps.
+
+resize_factor - The number to divide the video's resolution by. Very useful in cases where you want to load a video fast to tinker \
+with the other parameters before processing the full resolution video and actually measuring and tracking. Bear in mind that \
+the video could process differently when in full resolution. I tried to compensate for changes but it's not a guarantee."""
+
+    points_to_improve = \
+"""There are still many areas where I can still put in more work and indeed I do plan on doing so in the future. In my eyes, \
+this is Version 1 of the program and there's a lot of room for improvement:
+
+1. The stitching algorithm - I spent a lot of time trying different methods before I landed with the current one in place. \
+I learned "deep learning" and a good chunk of the math involved with it, I took apart the Stitching API of OpenCV \
+and reimplemented it to better fit my specific need, and devoted considerable time into learning linear algebra - \
+the main language of computer vision. Through it all I made sure to meaningfully understand the algorithms involved before \
+committing them to my code.
+I have put considerable effort into accelerating the code processing each frame, but it can be even faster with better utilization \
+of the GPU's parallel processing capabilities.
+
+2. The final panorama - The field of image stitching has evolved a lot in the past few years. The idea of taking a video detached \
+from its source camera and inferring the intrinsic properties of that camera was extremely hard just 6-7 years ago.
+Now we are at a time when such technologies pop up daily on our phones.
+I can use more advanced stitching methods to ensure better looking, seamlessly stitched, panoramas.
+
+3. Measurements - The whole experience of the App is supposed to imitate, in my eyes, the way editing programs (e.g. Photoshop, \
+PowerPoint, etc.) look and feel.
+I can put in more work into making that experience a reality. Right now there are known (and unknown) bugs or missing \
+features, like multiple lines moving together when selected in a certain way, the lack of ability to select more than one line at \
+a time, and many more.
+
+4. Tracking - The tracking is admittedly the aspect of the project to which I devoted the least amount of time. Right now tracking \
+and object detection are \"hot\" fields in machine learning, with many new, bigger, and better algorithms coming out monthly.
+I could have chosen a more accurate or even faster algorithm for tracking but chose to stay with the one I view as best among \
+OpenCV's catalog. Improving the tracking experience can greatly improve the usefulness of my program.
+
+Lastly, the experience of working with PySimpleGUI, a beautifully built, maintained, and documented library for GUI making, \
+was exquisite. Dipping my feet in the word of program-making proved to be not as daunting as I thought thanks to \
+PySimpleGUI's though provoking community. I'm sure I will build many more programs and project thanks to this smooth experience."""
     layout = [
-                [sg.T('Goals', font=heading_font, pad=(0,0))],
-                [HelpText(help_goals)],
-                [sg.T('Why?', font=heading_font, pad=(0,0))],
+                [sg.T('Goals', font=heading_font, pad=(0,10))],
                 [HelpText(help_why)],
-                [sg.T('FAQ', font=heading_font, pad=(0,0))],
-                [HelpText(help_explain)],
-                [sg.T('Expert Mode (optional)', font=heading_font)],
-                [HelpText(help_experience)],
-                [sg.T('Steps', font=heading_font, pad=(0,0))],
-                [HelpText(help_steps)],
-                [sg.B('Close')]
+                [sg.HorizontalSeparator(p=20)],
+                [sg.T('FAQ', font=heading_font, pad=(0,10))],
+                [HelpText(help_faq)],
+                [QuestionText(RIGHT_ARROW, '-Q1-'),
+                 QuestionText('Why does the panorama take ages to process and why need the video be as short as possible?', '-Q1-TEXT')],
+                [sg.pin(HelpText(q1_answer, visible=False, key='-A1-'))],
+                [QuestionText(RIGHT_ARROW, '-Q2-'),
+                 QuestionText('My distance measurements seem a bit off...', '-Q2-TEXT')],
+                [sg.pin(HelpText(q2_answer, visible=False, key='-A2-'))],
+                [QuestionText(RIGHT_ARROW, '-Q3-'),
+                 QuestionText('Why doesn\'t the Object Tracker work properly?', '-Q3-TEXT')],
+                [sg.pin(HelpText(q3_answer, visible=False, key='-A3-'))],
+                [HelpText(end_faq)],
+                [sg.HorizontalSeparator(p=20)],
+                [QuestionText(RIGHT_ARROW, key='-Q4-', font=heading_font), # Key to utilize collapsable feature
+                 sg.T('Expert Mode (optional)', font=heading_font, pad=(0,10), key='-Q4-TEXT', enable_events=True)], # Key to utilize collapsable feature
+                [sg.pin(HelpText(help_expert_mode, visible=False, key='-A4-'))], # Key to utilize collapsable feature
+                [sg.HorizontalSeparator(p=20)],
+                [QuestionText(RIGHT_ARROW, key='-Q5-', font=heading_font), # Key to utilize collapsable feature
+                 sg.T('Points for Thought', font=heading_font, pad=(0,10), key='-Q5-TEXT', enable_events=True)],
+                [sg.pin(HelpText(points_to_improve, visible=False, key='-A5-'))]
               ]
-    window = sg.Window('GUI Help', layout, keep_on_top=True, finalize=True)
+    window = sg.Window('GUI Help', [[sg.Col(layout, scrollable=True, vertical_scroll_only=True, expand_y=True, k='-COL-')], [sg.B('Close')]],
+                            keep_on_top=True, finalize=True, resizable=True)
+    window.set_size((window.size[0], sg.Window.get_screen_size()[1]))
 
-    while window.read()[0] not in ('Close', None):
-        continue
+    while True:
+        event, _ = window.read()
+         
+        if event in ('Close', None):
+            break
+        
+        if event.startswith('-Q'):
+            question_number = re.split('-|Q', event)[2]
+            arrow = window['-Q'+question_number+'-'].get()
+
+            if arrow == RIGHT_ARROW:
+                window['-Q'+question_number+'-'].update(DOWN_ARROW)
+                window['-A'+question_number+'-'].update(visible=True)
+            else:
+                window['-Q'+question_number+'-'].update(RIGHT_ARROW)
+                window['-A'+question_number+'-'].update(visible=False)
+            window.refresh()
+            window['-COL-'].contents_changed()
+
     window.close()
     del window
 
@@ -1506,7 +1637,7 @@ def expert_mode_window(stitcher: Stitcher, min_num: int, max_num:int, f: int):
                sg.Text('?', font='_ 14', size=(1,1), tooltip='Controls the minimum amount of overlap between\nstitched frames of the panorama.\nThe smaller min_match_num is, the lesser the overlap.\nIT\'S BETTER TO TINKER WITH max_match_num!')],
               [sg.Text('max_match_num', size=(15,1), font='_ 14'), sg.Input(default_text=f'{max_num}', size=(8,1), k='-MAX-', enable_events=True, font='_ 14'),
                sg.Text('?', font='_ 14', size=(1,1), tooltip='Controls the maximum amount of overlap between\nstitched frames of the panorama.\nThe larger max_match_num is, the greater the overlap.')],
-              [sg.Text('f', size=(15,1), font='_ 14'), sg.Input(default_text=f'{f}', size=(8,1), k='-F-', enable_events=True, font='_ 14'),
+              [sg.Text('focal length (f)', size=(15,1), font='_ 14'), sg.Input(default_text=f'{f}', size=(8,1), k='-F-', enable_events=True, font='_ 14'),
                sg.Text('?', font='_ 14', size=(1,1), tooltip='Controls the focal point of the panorama.\nThe smaller f, the greater the curvature of the panorama.\nRule of Thumb: The greater the angle the camera pans,\nthe smaller f should be, and vice versa.')],
               [sg.Text('resize_factor', size=(15,1), font='_ 14'), sg.Spin([1,2,3,4,5], initial_value=stitcher.get_resize_factor(), size=(4,1), k='-RESIZE-', enable_events=True, readonly=True, background_color='white', font='_ 14'),
                sg.Text('?', font='_ 14', size=(1,1), tooltip='Controls the amount by which the quality decreases.\nBest for debuging and perfecting the\nappropriate parameters for a given video.')],
@@ -1556,11 +1687,13 @@ def make_tracking_window():
               [sg.Text('Select by dragging a rectangle on the image.', font='_ 14')],
               [sg.Text('To begin tracking, press the ENTER or SPACE keys on your keyboard.', font='_ 14')],
               [sg.Text('To cancel the tracking, press the C letter key on your keyboard.', font='_ 14')],
-              [sg.B('Next', font='_ 14')]]
+              [sg.B('Next', font='_ 14', k='-NEXT-')]]
 
     window = sg.Window("Track Object", layout, finalize=True, disable_close=True, keep_on_top=True, element_justification='c', text_justification='c', modal=True)
+    window['-NEXT-'].set_focus(True)
+    window.bind('<Return>', '-NEXT-')
 
-    while window.read()[0] not in ('Next', None):
+    while window.read()[0] not in ('Next', None, '-NEXT-'):
         continue
     window.close()
     del window
@@ -1569,7 +1702,10 @@ def make_window1() -> sg.Window:
     '''
     Make window1 of browsing.
     '''
-    col = [[sg.Push(), sg.Text(s=(4,1)), sg.Text('Select video', font='_ 16'), sg.Push(), sg.vtop(sg.B('More', font='_ 14'))],
+    col = [[sg.Text(s=(6,1), k='-SIZER-'), sg.Push(), sg.Text('Select video', font='_ 16'), sg.Push(),
+            sg.vtop(sg.pin(sg.B('More', font='_ 14', visible=False, k='-EXPERT-'))),
+            sg.vtop(sg.pin(sg.B('Help', font='_ 14', k='-HELP-')))
+           ],
            [sg.Text(font='_ 14', text='Please upload as short a video as you can.')],
            [sg.Text('Also pretty please, make sure the video is shot with minimal vertical movement (or else the algorithm freaks).', font='_ 14')],
            [sg.In(key="-FILEPATH-", enable_events=True, font='_ 14'), sg.FileBrowse("Browse", font='_ 14')],
@@ -1613,12 +1749,12 @@ def make_window2() -> sg.Window:
                 [sg.VPush()]]
 
     magnifier = [[sg.Slider(range=(100, 10), default_value=40, resolution=10, orientation='v',
-                    enable_events=True, k='-MAGNIFY SIZE-', tooltip='Magnifing Area'),
+                    enable_events=True, k='-MAGNIFY SIZE-', tooltip='Magnifying Area'),
                   sg.Graph((200,200), graph_bottom_left=(0,200), key='-MAGNIFY-',
                     graph_top_right=(200,0), background_color="light grey")
                 ]]
 
-    layout = [[sg.vtop(sg.B('Help', font='_ 12')), sg.Push(),
+    layout = [[sg.vtop(sg.B('Help', font='_ 12', k='-HELP-')), sg.Push(),
                sg.Frame('Help Text',
                         [[sg.Text('Please Track Object or Calibrate Distance.', font='_ 16',
                             k='-TEXT-', background_color='red', justification='c', expand_x=True)]],
@@ -1751,20 +1887,20 @@ def popup_get_distance() -> Tuple[Union[float, None], str]:
 
     return value, distance_units
 
-def convert_to_units(measurment: Union[int, float], units: str) -> str:
+def convert_to_units(measurement: Union[int, float], units: str) -> str:
     '''
     Convert distance in {units} to its units.
     '''
-    measurment_text = ''
+    measurement_text = ''
     if units == 'Feet and Inches':
         # Convert from [inches] to [feet'inches and fraction of an inch"]
-        feet = int(measurment // 12)
-        inches = int(measurment % 12)
-        fraction_inch = Fraction(int(8 * ((measurment % 12) - inches)), 8) if measurment % 12 != 0 else 0
+        feet = int(measurement // 12)
+        inches = int(measurement % 12)
+        fraction_inch = Fraction(int(8 * ((measurement % 12) - inches)), 8) if measurement % 12 != 0 else 0
 
-        measurment_text = f'{feet}\'{inches} {fraction_inch}"' if fraction_inch != 0 else f'{feet}\'{inches}"'
+        measurement_text = f'{feet}\'{inches} {fraction_inch}"' if fraction_inch != 0 else f'{feet}\'{inches}"'
     else: # Meters or pixels
-        measurment_text = f'{measurment: .2f} {units}'
-    return measurment_text
+        measurement_text = f'{measurement: .2f} {units}'
+    return measurement_text
 
 GUI()
