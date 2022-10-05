@@ -109,7 +109,9 @@ class GUI:
 
             # Entered expert mode
             if event == '-EXPERT-':
+                self.window.disable()
                 expert_mode_window(self.stitcher, self.min_match_num, self.max_match_num, self.f)
+                self.window.enable()
 
                 if self.stitcher.get_resize_factor() == 1:
                     self.max_match_num = self.stitcher.max_match_num
@@ -404,6 +406,14 @@ class GUI:
                 else:
                     self.text.update('Calibrate Distance to add velocity information.', background_color=sg.theme_text_element_background_color())
                     self.text.current_background = sg.theme_text_element_background_color()
+
+                if -1 in self.COM_points:
+                    help_text = self.text.get()
+
+                    fail_index = self.COM_points.index(-1)
+                    help_text += f' Tracking failure at frame {fail_index+1}.'
+
+                    self.text.update(help_text)
 
                 self.window['-PLAY-'].set_focus()
 
