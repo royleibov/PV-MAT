@@ -118,6 +118,10 @@ class GUI:
         
             # Handle help
             if event == '-HELP-':
+                if self.play_pause:
+                    self.play = False
+                    self.play_pause.update("Play")
+
                 help_window()
 
             if event == '+SHIFT DOWN+':
@@ -304,6 +308,7 @@ class GUI:
             if event == '-TRACK-':
                 # Stop any video play
                 self.play = False
+                self.play_pause.update("Play")
 
                 current_text = self.text.get()
                 current_bg = self.text.current_background
@@ -311,19 +316,26 @@ class GUI:
                 self.text.current_background = 'red'
                 self.window.refresh()
 
+                self.window.disable()
                 make_tracking_window()
+                self.window.enable()
 
                 frame = self.frame_locations[0][0]
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
                 # Taken from https://broutonlab.com/blog/opencv-object-tracking
                 # Select the bounding box in the first frame
-                cv2.namedWindow('Select Region of Interest')
+                WindowName = 'Select Region of Interest'
+                cv2.namedWindow(WindowName)
+                frame = cv2.resize(frame, (self.graph_width, self.graph_height))
                 window_width, window_height = sg.Window.get_screen_size()
-                move_height = (window_height - self.pano_height) // 2
-                move_width = (window_width - self.pano_width) // 2
-                cv2.moveWindow('Select Region of Interest', move_width, move_height)
+                move_height = (window_height - self.graph_height) // 2
+                move_width = (window_width - self.graph_width) // 2
+                cv2.setWindowProperty(WindowName, cv2.WND_PROP_TOPMOST, 1)
+                cv2.moveWindow(WindowName, move_width, move_height)
 
-                bbox = cv2.selectROI('Select Region of Interest', frame, True)
+                self.window.disable()
+                bbox = cv2.selectROI(WindowName, frame, True) # bbox: (top_left_x, top_left_y, box_width, box_height)
+                self.window.enable()
 
                 # print(f'bbox: {bbox} 0')
                 cv2.destroyAllWindows()
@@ -334,6 +346,10 @@ class GUI:
 
                     self.window['-PLAY-'].set_focus()
                     continue
+
+                frame = cv2.resize(frame, (self.pano_width, self.pano_height))
+                
+                bbox = tuple([int(p * self.pano_width / self.graph_width) for p in bbox])
 
                 # Reset previous tracking session
                 del self.tracker
@@ -1463,7 +1479,7 @@ Given the restrictions put forth in the starting window (a video as short as pos
 - Up<->Down, Left<->Right, etc.) I believe this App can be very powerful!"""
 
     help_faq = \
-"""If you have followed the restrictions and still are experiencing problems try and find a solution here:"""
+"""If you have followed the restrictions and Help Text and still are experiencing problems try and find a solution here:"""
 
     q1_answer = \
 """There are a plethora of problems that can arise in the panorama-making step, but a few you can solve are:
@@ -1581,10 +1597,10 @@ and object detection are \"hot\" fields in machine learning, with many new, bigg
 I could have chosen a more accurate or even faster algorithm for tracking but chose to stay with the one I view as best among \
 OpenCV's catalog. Improving the tracking experience can greatly improve the usefulness of my program.
 
-5. User experience - I believe a great deal that a good, concise, and understandable UI will lead to good UX. I can add in the \
-future the ability to opt-out of waiting all the way through while stitching the panorama or tracking an object. Right now trying \
-to close the progressbars does nothing, because I found it too difficult at the moment to implement a stopping mechanism on \
-seperate threads.
+5. User experience - I believe a great deal that a good, concise, and understandable UI will lead to good UX.
+I can add in the future the ability to opt-out of waiting all the way through while stitching the panorama or tracking \
+an object. Right now trying to close the progressbars does nothing, because I found it too difficult at the moment to implement \
+a stopping mechanism on seperate threads.
 
 Lastly, the experience of working with PySimpleGUI, a beautifully built, maintained, and documented library for GUI making, \
 was exquisite. Dipping my feet in the word of program-making proved to be not as daunting as I thought thanks to \
@@ -1654,7 +1670,7 @@ def expert_mode_window(stitcher: Stitcher, min_num: int, max_num:int, f: int):
                sg.Text('?', font='_ 14', size=(1,1), tooltip='Controls the amount by which the quality decreases.\nBest for debuging and perfecting the\nappropriate parameters for a given video.')],
               [sg.B('Save', font='_ 14')]]
 
-    window = sg.Window('Expert Mode', layout, text_justification='c', finalize=True, resizable=True, modal=True, keep_on_top=True)
+    window = sg.Window('Expert Mode', layout, text_justification='c', finalize=True, resizable=True, modal=True)
 
     values = None
 
@@ -1695,9 +1711,9 @@ def make_tracking_window():
     Make the tracking explaination window popup.
     '''
     layout = [[sg.Text('Track Object', font='_ 16')],
-              [sg.Text('Select an object by dragging a rectangle on the image.', font='_ 14')],
-              [sg.Text('To begin tracking, press the ENTER or SPACE keys on your keyboard.', font='_ 14')],
-              [sg.Text('To cancel the tracking, press the C letter key on your keyboard.', font='_ 14')],
+              [sg.Text('Press the \'Next\' button to select an object by dragging a rectangle on the image.', font='_ 14')],
+              [sg.Text('In the next window, to begin tracking press the ENTER or SPACE keys on your keyboard.', font='_ 14')],
+              [sg.Text('In the next window, to cancel the tracking press the \'C\' letter key on your keyboard.', font='_ 14')],
               [sg.B('Next', font='_ 14', k='-NEXT-')]]
 
     window = sg.Window("Track Object", layout, finalize=True, disable_close=True, keep_on_top=True, element_justification='c', text_justification='c', modal=True)
