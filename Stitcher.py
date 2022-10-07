@@ -4,20 +4,15 @@ Stitch together a panorama from a given video [input]
 
 #TODO: remove all os filepath manipulations - savings and stuff
 
-import argparse
 import os
-from typing import Tuple, overload, Union
+from typing import Tuple, Union
 import cv2
 import numpy as np
-import time
 import glob
+# import time
+
 
 import PySimpleGUI as sg
-
-from OpenGL.GL import *
-from OpenGL.GLU import *
-from OpenGL.GLUT import *
-from OGLVideoView import OGLVideoView
 
 class Stitcher(object):
     '''
@@ -30,13 +25,14 @@ class Stitcher(object):
         self.frame_dump = []
 
         self.__filepath = None
+        self.FPS = None
 
         self.min_match_num = 40
         self.max_match_num = max_match
 
         self.__resize = resize_factor
 
-        self.debug = True
+        self.debug = False
 
         self.f = focal_length
 
@@ -60,6 +56,7 @@ class Stitcher(object):
         # Construct VideoCapture object to get frame-by-frame stream\
         vid_cap = cv2.VideoCapture(self.__filepath)
         total_frames = int(vid_cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        self.FPS = vid_cap.get(cv2.CAP_PROP_FPS)
 
         # glutInit(sys.argv)
 
@@ -81,14 +78,14 @@ class Stitcher(object):
                 except OSError as e:
                     print("Error: %s : %s" % (file_path, e.strerror))
 
-        tic = time.time()
+        # tic = time.time()
         last = self.cylindrical_project(last)
-        toc = time.time()
+        # toc = time.time()
         # print(f"Cylindrical warp time: {toc - tic} 0/{total_frames}")
 
         if self.debug:
             cv2.imwrite('key_frames/frame0.jpg', last)
-            print("Captured frame0.jpg")
+            # print("Captured frame0.jpg")
         frame_num = 1
 
         image = last # An unnecessary assignment
@@ -108,9 +105,9 @@ class Stitcher(object):
             self.window.write_event_value('-UPDATE PROGRESS BAR-', (1, debug_num, total_frames,
                                                              f'Reading frame {debug_num}/{total_frames} to panorama'))
 
-            tic = time.time()
+            # tic = time.time()
             image = self.cylindrical_project(image)
-            toc = time.time()
+            # toc = time.time()
             # print(f"Cylindrical warp time: {toc - tic} {debug_num}/{total_frames}")
             self.frame_dump.append(image)
 
@@ -126,7 +123,7 @@ class Stitcher(object):
 
                 if self.debug:
                     # Save key frame as JPG file
-                    print("Captured frame{}.jpg".format(frame_num))
+                    # print("Captured frame{}.jpg".format(frame_num))
                     cv2.imwrite('key_frames/frame%d.jpg' % frame_num, last)
                     frame_num += 1
 
@@ -200,7 +197,7 @@ class Stitcher(object):
         Starts from middle and proceeds to edges.
         '''
         num_frames = len(frame_pairs) + 1 # Num of pairs + 1
-        print(f'num frames: {num_frames}')
+        # print(f'num frames: {num_frames}')
         if num_frames == 2:
             # Rerun value is of (subprocess number, current place, total in subsection, text)
             self.window.write_event_value('-UPDATE PROGRESS BAR-', (2, 0, 4,
@@ -228,7 +225,7 @@ class Stitcher(object):
         self.window.write_event_value('-UPDATE PROGRESS BAR-', (2, 2, 4,
                                                             "Stitching left side and right side together"))
 
-        print("Merging both sides")
+        # print("Merging both sides")
         self.set_max_match_num(np.inf)
         success_H, final_H = self.find_homography(left_panorama, right_panorama)
         
@@ -432,6 +429,13 @@ class Stitcher(object):
         '''
         return self.__resize
 
+    def get_fps(self) -> float:
+        '''
+        Returns the video's FPS.
+        '''
+
+        return self.FPS
+
     def set_window(self, window: sg.Window):
         '''
         Set the window after creation.
@@ -475,7 +479,7 @@ class Stitcher(object):
             # Place the frame on top of the panorama and save its edeges' locations
             if success_H:
                 
-                print('here%d' % debug_count)
+                # print('here%d' % debug_count)
                 # Retun value is of (subprocess number, current place, total in subsection, text)
                 self.window.write_event_value('-UPDATE PROGRESS BAR-', (3, debug_count, num_frames,
                                                                         f"Placing frame {debug_count}/{num_frames} on top of the panorama"))
@@ -504,7 +508,7 @@ def right_stitch(frame_pairs) -> np.ndarray:
     Gets list of (img1, img2, H), stitches to the right.
     Returns panorama.
     '''
-    print(f"Stitching the right side {len(frame_pairs)}")
+    # print(f"Stitching the right side {len(frame_pairs)}")
     # Overall homography
     H_panorama = np.eye(3)
 
@@ -556,7 +560,7 @@ def left_stitch(frame_pairs) -> np.ndarray:
     Gets list of (img1, img2, H), stitches to the right.
     Returns panorama.
     '''
-    print(f"Stitching the left side {len(frame_pairs)}")
+    # print(f"Stitching the left side {len(frame_pairs)}")
     # Overall homography
     H_panorama = np.eye(3)
     
