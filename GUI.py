@@ -1564,6 +1564,7 @@ def help_window():
     help_why = \
 """The name PV-MAT (Panoramic Video Measurement and Tracking) is an ironic play on "The Ideal Gas Law: PV=nRT" - There's nothing \
 ideal about the chaotic movement of real-life objects.
+
 Let's start with a review of the Goals of the PV-MAT project (the App):
 1. To learn more and analyze anything that comes to mind
 2. For you to be successful
