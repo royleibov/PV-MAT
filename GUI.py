@@ -64,7 +64,9 @@ class GUI:
         self.pixel_dist = -1 # line's pixel distance
         self.EdgeCircles = {} # Circles at edge of line to denote line selection. self.EdgeCircles[circle_id] = Circle. Circle = {'line_id': line_id, 'position': center_xy}
         self.distance_text_id = {}
+        self.distance_text_background = {}
         self.draw_distance_text = False
+        self.line_color = 'white'
 
         # Stitcher object and variables
         self.stitcher = Stitcher(self.window)
@@ -90,9 +92,11 @@ class GUI:
         self.draw_path = False
         self.velocities = [] # In pixels/second
         self.velocity_text_id = None
+        self.velocity_background = None
         self.draw_velocity = False
         self.vel_units_ratio = -1 # Turn self.calibration_ratio/second to self.velocity_units
         self.velocity_units = 'km/h'
+        self.path_color = 'white'
 
         # Start threading to load video correctly
         self.thread(self.update)
@@ -113,6 +117,7 @@ class GUI:
                 expert_mode_window(self.stitcher, self.min_match_num, self.max_match_num, self.f)
                 self.window.enable()
 
+                # Save the settings for later only if the resolution wasn't played with
                 if self.stitcher.get_resize_factor() == 1:
                     self.max_match_num = self.stitcher.max_match_num
                     self.min_match_num = self.stitcher.min_match_num
@@ -120,12 +125,14 @@ class GUI:
         
             # Handle help
             if event == '-HELP-':
+                # Stop the video from playing
                 if self.play_pause:
                     self.play = False
                     self.play_pause.update("Play")
 
                 help_window()
 
+            # Show or hide Expert Mode by pressing SHIFT
             if event == '+SHIFT DOWN+':
                 self.show_help = not self.show_help
                 self.window['-HELP-'].update(visible=self.show_help)
@@ -235,8 +242,8 @@ class GUI:
                 # Set new graph size
                 self.graph_width = self.window.get_screen_size()[0]
                 self.graph_height = int(self.graph_width * self.pano_height / self.pano_width)
-                if self.graph_height > self.window.get_screen_size()[1] * 12/25:
-                    self.graph_height = self.window.get_screen_size()[1] * 12//25
+                if self.graph_height > self.window.get_screen_size()[1] * 9/20:
+                    self.graph_height = self.window.get_screen_size()[1] * 9//20
                     self.graph_width = int(self.graph_height * self.pano_width / self.pano_height)
 
                 self.graph.set_size((self.graph_width, self.graph_height))
@@ -260,11 +267,13 @@ class GUI:
                 self.play = False
                 self.play_pause.update("Play")
 
+                # Wrap around
                 if self.current_frame_num > 1:
                     self.current_frame_num = int(values['-SLIDER-'] - 1)
                 else:
                     self.current_frame_num = self.num_frames
 
+                # Draw frame
                 self.image = self.goto_frame(self.current_frame_num, image_id=self.image) # Might be the first time
 
                 # Send a graph event to update the magnifier
@@ -273,6 +282,7 @@ class GUI:
                 self.window['-PLAY-'].set_focus()
 
             if event == '-PLAY-':
+                # self.play controls the update() function
                 if self.play:
                     self.play = False
                     self.play_pause.update("Play")
@@ -284,6 +294,7 @@ class GUI:
                 self.play = False
                 self.play_pause.update("Play")
 
+                # Wrap around
                 if self.current_frame_num < self.num_frames:
                     self.current_frame_num = int(values['-SLIDER-'] + 1)
                 else:
@@ -312,16 +323,19 @@ class GUI:
                 self.play = False
                 self.play_pause.update("Play")
 
-                current_text = self.text.get()
+                # Write to screen
+                current_text = self.text.get() # Save for case of cancelling
                 current_bg = self.text.current_background
                 self.text.update('Entered tracking mode!', background_color='red')
                 self.text.current_background = 'red'
                 self.window.refresh()
 
+                # Show instructions
                 self.window.disable()
                 make_tracking_window()
                 self.window.enable()
 
+                # Prepare ROI selection window
                 frame = self.frame_locations[0][0]
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
                 # Taken from https://broutonlab.com/blog/opencv-object-tracking
@@ -342,6 +356,7 @@ class GUI:
                 # print(f'bbox: {bbox} 0')
                 cv2.destroyAllWindows()
 
+                # Canceled
                 if bbox == (0, 0, 0, 0):
                     self.text.update(current_text, background_color=current_bg)
                     self.text.current_background = current_bg
@@ -349,8 +364,10 @@ class GUI:
                     self.window['-PLAY-'].set_focus()
                     continue
 
+                # Go back to original frame size
                 frame = cv2.resize(frame, (self.pano_width, self.pano_height))
                 
+                # Convert to orginial coordinates
                 bbox = tuple([int(p * self.pano_width / self.graph_width) for p in bbox])
 
                 # Reset previous tracking session
@@ -369,15 +386,23 @@ class GUI:
 
                 self.tracker.init(frame, bbox)
 
+                # Do the tracking in a different thread
                 self.thread(self.track)
 
+            # Changed path color
+            if event == '-PATH COLOR-':
+                self.path_color = values[event]
+
+                self.draw_track()
+
+            # Changed velocity units
             if event == '-VEL UNITS-':
                 self.velocity_units = values[event]
                 self.set_velocity_units()
 
                 self.window['-PLAY-'].set_focus()
 
-            # Tracker done. Draw bounding boxes
+            # Tracker done. Draw bounding boxes and path
             if event == '-TRACKER DONE-':
                 self.window['-BOX-'].update(True, disabled=False)
                 self.draw_bounding_boxes = True
@@ -385,28 +410,35 @@ class GUI:
                 self.window['-PATH-'].update(True, disabled=False)
                 self.draw_path = True
 
+                self.window['-PATH COLOR-'].update(disabled=False)
+
                 self.draw_track()
 
                 del self.tracker
                 self.tracker = cv2.TrackerCSRT_create()
                 gc.collect()
 
+                # Calculate velocities if a calibration was already done
                 if self.calibration_ratio > 0:
                     self.thread(self.calculate_velocity)
 
+                    # Enable velocity features
                     self.window['-VELOCITY-'].update(True, disabled=False)
                     self.draw_velocity = True
                     self.window['-VEL UNITS-'].update(disabled=False)
                     self.window['-VEL UNITS-'].set_tooltip('Velocity Units')
 
+                    # Calculate velocities given the units
                     self.set_velocity_units()
 
+                    # Update Help Text
                     self.text.update('Velocity was added!', background_color=sg.theme_text_element_background_color())
                     self.text.current_background = sg.theme_text_element_background_color()
-                else:
+                else: # Suggest calibrating
                     self.text.update('Calibrate Distance to add velocity information.', background_color=sg.theme_text_element_background_color())
                     self.text.current_background = sg.theme_text_element_background_color()
 
+                # If there was tracking failure, inform the user
                 if -1 in self.COM_points:
                     help_text = self.text.get()
 
@@ -420,7 +452,7 @@ class GUI:
 
             # Called if play button was pressed
             if event == '-THREAD UPDATE-':
-                if self.image:
+                if self.image: # Not sure what's he use of the if statement
                     self.image = self.draw_image(values[event], image_id=self.image)
                     self.update_counter()
 
@@ -457,6 +489,9 @@ class GUI:
                     if self.velocity_text_id:
                         self.graph.delete_figure(self.velocity_text_id)
                         self.velocity_text_id = None
+
+                        self.graph.delete_figure(self.velocity_background)
+                        self.velocity_background = None
                 self.draw_track()
 
 
@@ -494,16 +529,24 @@ class GUI:
 
                 self.window['-PLAY-'].set_focus()
 
+                # Select the last line if exists to show the change of units
                 if self.last_figure:
                     self.window['-SELECT-'].update(True)
                     values['-SELECT-'] = True
+
                     self.select_and_move(self.last_figure, (0,0))
+
                     self.cursor = 'fleur'
                     self.graph.set_cursor(self.cursor)
                     self.text.update('Select the line to drag or resize.')
 
+                # Draw or delete other texts
                 self.window.write_event_value('-SHOW DIS-', values['-SHOW DIS-'])
 
+            
+            # Changed distance line color
+            if event == '-DIS COLOR-':
+                self.line_color = values[event]
 
 
             # There's a change of magnify size
@@ -569,7 +612,7 @@ class GUI:
                     draw = PIL.ImageDraw.Draw(frame)
 
                     for propreties in self.Lines.values():
-                        draw.line(propreties[:2], fill='white', width=1)
+                        draw.line(propreties[:2], fill=self.line_color, width=1)
 
                     # Check if hovering above or selecting a circle
                     on_circle = False
@@ -674,6 +717,9 @@ class GUI:
                             if self.last_figure in self.distance_text_id:
                                 self.graph.delete_figure(self.distance_text_id[self.last_figure])
                                 self.distance_text_id.pop(self.last_figure)
+
+                                self.graph.delete_figure(self.distance_text_background[self.last_figure])
+                                self.distance_text_background.pop(self.last_figure)
                             
                             self.last_figure = None
 
@@ -681,6 +727,7 @@ class GUI:
                         if self.calibration_ratio < 0:
                             self.window['-LINE-'].update(False, disabled=True)
                             self.window['-SELECT-'].update(False, disabled=True)
+                            self.window['-DIS COLOR-'].update(disabled=True)
 
                             self.cursor = 'arrow'
                             self.graph.set_cursor(self.cursor)
@@ -745,11 +792,15 @@ class GUI:
 
                             if self.last_figure in self.distance_text_id:
                                 self.graph.delete_figure(self.distance_text_id[self.last_figure])
+                                self.distance_text_id.pop(self.last_figure)
+
+                                self.graph.delete_figure(self.distance_text_background[self.last_figure])
+                                self.distance_text_background.pop(self.last_figure)
 
                         for line_id in self.Lines:
                             self.update_distance(line_id, self.draw_distance_text)
 
-                        self.last_figure = self.graph.draw_line(self.start_point, self.end_point, color='white', width=2)
+                        self.last_figure = self.graph.draw_line(self.start_point, self.end_point, color=self.line_color, width=2)
 
                         self.Lines[self.last_figure] = [self.start_point, self.end_point, self.pixel_dist]
 
@@ -784,9 +835,13 @@ class GUI:
 
                                     if self.last_figure in self.distance_text_id:
                                         self.graph.delete_figure(self.distance_text_id[self.last_figure])
+                                        self.distance_text_id.pop(self.last_figure)
+
+                                        self.graph.delete_figure(self.distance_text_background[self.last_figure])
+                                        self.distance_text_background.pop(self.last_figure)
 
                                 # Redraw line
-                                self.last_figure = self.graph.draw_line(my_circle['position'], other_circle['position'], color='white', width=2)
+                                self.last_figure = self.graph.draw_line(my_circle['position'], other_circle['position'], color=self.line_color, width=2)
                                 self.graph.bring_figure_to_front(fig)
                                 self.graph.bring_figure_to_front(other_id)
 
@@ -841,6 +896,9 @@ class GUI:
                                     self.graph.delete_figure(self.distance_text_id[fig])
                                     self.distance_text_id.pop(fig)
 
+                                    self.graph.delete_figure(self.distance_text_background[fig])
+                                    self.distance_text_background.pop(fig)
+
                                 if fig == self.last_figure:
                                     self.last_figure = None
 
@@ -856,6 +914,8 @@ class GUI:
                         self.last_figure = None
                         del self.distance_text_id
                         self.distance_text_id = {}
+                        del self.distance_text_background
+                        self.distance_text_background = {}
 
 
             # Calibration button was pressed
@@ -905,6 +965,9 @@ class GUI:
                 elif self.last_figure in self.distance_text_id:
                     self.graph.delete_figure(self.distance_text_id[self.last_figure])
                     self.distance_text_id.pop(self.last_figure)
+
+                    self.graph.delete_figure(self.distance_text_background[self.last_figure])
+                    self.distance_text_background.pop(self.last_figure)
 
                 self.cursor = 'fleur'
                 self.graph.set_cursor(self.cursor)
@@ -977,7 +1040,9 @@ class GUI:
                 del self.EdgeCircles
                 self.EdgeCircles = {} # Circles at edge of line to denote line selection. self.EdgeCircles[circle_id] = Circle. Circle = {'line_id': line_id, 'position': center_xy}
                 self.distance_text_id = {}
+                self.distance_text_background = {}
                 self.draw_distance_text = False
+                self.line_color = 'white'
 
                 self.stitcher.reset_stitcher()
 
@@ -996,11 +1061,13 @@ class GUI:
                 del self.velocities
                 self.velocities = []
                 self.velocity_text_id = None
+                self.velocity_background = None
                 self.draw_velocity = False
                 self.vel_units_ratio = -1
                 self.velocity_units = 'km/h'
                 del self.COM_path
                 self.COM_path = []
+                self.path_color = 'white'
 
                 gc.collect()
                 
@@ -1046,6 +1113,9 @@ class GUI:
             self.graph.delete_figure(self.distance_text_id[line_id])
             self.distance_text_id.pop(line_id)
 
+            self.graph.delete_figure(self.distance_text_background[line_id])
+            self.distance_text_background.pop(line_id)
+
         if not draw_text:
             return
 
@@ -1075,6 +1145,9 @@ class GUI:
 
         self.distance_text_id[line_id] = self.graph.draw_text(measurement_text, text_pt, color='white',
                                                             font='_ 18', text_location=text_location)
+        top_left, bottom_right = self.graph.get_bounding_box(self.distance_text_id[line_id])
+        self.distance_text_background[line_id] = self.graph.draw_rectangle(top_left, bottom_right, fill_color='#000000')
+        self.graph.bring_figure_to_front(self.distance_text_id[line_id])
 
     def enable_toolbox(self):
         '''
@@ -1086,6 +1159,7 @@ class GUI:
         self.window['-CLEAR-'].update(disabled=False)
         self.window['-DIS UNITS-'].update(disabled=False)
         self.window['-SHOW DIS-'].update(disabled=False)
+        self.window['-DIS COLOR-'].update(disabled=False)
 
     def calibration_toolbox(self):
         '''
@@ -1095,6 +1169,7 @@ class GUI:
         self.window['-SELECT-'].update(disabled=False)
         self.window['-ERASE-'].update(disabled=True)
         self.window['-CLEAR-'].update(disabled=True)
+        self.window['-DIS COLOR-'].update(disabled=False)
 
     def set_velocity_units(self):
         '''
@@ -1331,7 +1406,7 @@ class GUI:
                 self.graph.delete_figure(self.path_id)
 
             # Draw path and save its id
-            self.path_id = self.graph.draw_lines(points, color = 'white', width=2)
+            self.path_id = self.graph.draw_lines(points, color = self.path_color, width=2)
 
         # Drawing the bounding boxes and velocities
         if len(self.bounding_boxes) >= self.current_frame_num:
@@ -1345,6 +1420,7 @@ class GUI:
             # Delete previous text
             if self.velocity_text_id:
                 self.graph.delete_figure(self.velocity_text_id)
+                self.graph.delete_figure(self.velocity_background)
 
             # If frame's box was a tracking failure do nothing
             if -1 in (top_left, bottom_right):
@@ -1371,6 +1447,9 @@ class GUI:
                 # Print text to screen
                 velocity_text = f'Vel: {velocity:.3} {self.velocity_units}'
                 self.velocity_text_id = self.graph.draw_text(velocity_text, (top_left[0], top_left[1]-20), font='_ 20', color='white')
+                top_left, bottom_right = self.graph.get_bounding_box(self.velocity_text_id)
+                self.velocity_background = self.graph.draw_rectangle(top_left, bottom_right, fill_color='#000000')
+                self.graph.bring_figure_to_front(self.velocity_text_id)
 
 
     def draw_image(self, frame, graph = None, image_id: int = None) -> Union[int, None]:
@@ -1480,7 +1559,7 @@ def help_window():
 
     help_why = \
 """Let's start with a review of the Goals of the PanoramicVideoStitching project (the App):
-1. To learn more and analyze all the things
+1. To learn more and analyze anything that comes to mind
 2. For you to be successful
 
 This App solves a necessity that came up in training, but could be expanded to anything involving a video and some movement.
@@ -1489,7 +1568,7 @@ Given the restrictions put forth in the starting window (a video as short as pos
 - Up<->Down, Left<->Right, etc.) I believe this App can be very powerful!"""
 
     help_faq = \
-"""If you have followed the restrictions and Help Text and still are experiencing problems try and find a solution here:"""
+"""If you have followed the restrictions and Help Text and are still experiencing problems try and find a solution here:"""
 
     q1_answer = \
 """There are a plethora of problems that can arise in the panorama-making step, but a few you can solve are:
@@ -1546,7 +1625,7 @@ then tracking their entire body.
 For the limitations of the tracking algorithm, see 'Points for Thought' below."""
 
     end_faq = \
-"""If there's any other problems that arise while using the App please let me know. Any small unexpected behavior will be \
+"""If there are any other problems that arise while using the App please let me know. Any small unexpected behavior will be \
 heavily looked on and exterminated so think long and hard before you take upon yourself the death of a bug."""
 
     help_expert_mode = \
@@ -1571,7 +1650,7 @@ variable, the lesser the overlap between frames chosen for stitching, and the fe
 loading time).
 
 focal length (f) - Put simply, the closer you are to the plane of interest the smaller f should be. Literally, it's the radius of \
-the circle the camera sweeps when you pan, or a combination of it and the distance of the camera from the plane (in 3D) \
+the circle the camera sweeps when you pan across a scene, or a combination of it and the distance of the camera from the plane (in 3D) \
 you're interested in. Practically, you can think of it as the measurement of how curved the frames in the video should be. \
 The smaller f the curvier the frames are, and the closer you are to the plane of interest or bigger the angle the camera sweeps.
 
@@ -1613,7 +1692,7 @@ an object. Right now trying to close the progressbars does nothing, because I fo
 a stopping mechanism on seperate threads.
 
 Lastly, the experience of working with PySimpleGUI, a beautifully built, maintained, and documented library for GUI making, \
-was exquisite. Dipping my feet in the word of program-making proved to be not as daunting as I thought thanks to \
+was exquisite. Dipping my feet in the world of program-making proved to be not as daunting as I thought thanks to \
 PySimpleGUI community's guidence. I'm sure I will build many more programs and projects thanks to this smooth experience."""
     layout = [
                 [sg.T('Goals', font=heading_font, pad=(0,10))],
@@ -1743,8 +1822,8 @@ def make_window1() -> sg.Window:
             sg.vtop(sg.pin(sg.B('More', font='_ 14', visible=False, k='-EXPERT-'))),
             sg.vtop(sg.pin(sg.B('Help', font='_ 14', k='-HELP-')))
            ],
-           [sg.Text(font='_ 14', text='Please upload as short a video as you can.')],
-           [sg.Text('Also pretty please, make sure the video is shot with minimal vertical movement (or else the algorithm freaks).', font='_ 14')],
+           [sg.Text(font='_ 14', text='Please upload as short a video as you can (I would suggest 6-10 seconds max).')],
+           [sg.Text('Also pretty please, make sure the video is shot with movement on a single axis (or else the algorithm freaks).', font='_ 14')],
            [sg.In(key="-FILEPATH-", enable_events=True, font='_ 14'),
             sg.FileBrowse("Browse", font='_ 14', file_types=(('All Video Files', '*.mp4 *.mov *.mkv *.avi *.wmv'),))],
            [sg.B('Exit', k='-EXIT-', font='_ 14')]]
@@ -1769,6 +1848,10 @@ def make_window2() -> sg.Window:
            [sg.VPush()],
            [sg.Combo(['Meters', 'Feet and Inches'], default_value='Meters', readonly=True, k='-DIS UNITS-',
                         enable_events=True, tooltip='Distance Units', font='_ 16', disabled=True)],
+           [sg.VPush()],
+           [sg.Text('Line Color:', font='_ 16'), sg.Combo(['white', 'black', 'red', 'green', 'blue'],
+                        default_value='white', readonly=True, k='-DIS COLOR-',
+                        enable_events=True, tooltip='Line Color', font='_ 16', disabled=True)],
            [sg.VPush()]]
     
     track_and_calibrate = [[sg.Text(expand_x=True, expand_y=True, font='_ 1', pad=(0,0))],
@@ -1779,11 +1862,14 @@ def make_window2() -> sg.Window:
     tracking_toolbar = [[sg.VPush()],
                 [sg.Check('Draw Path', k='-PATH-', enable_events=True, disabled=True, font='_ 16')],
                 [sg.Check('Draw Bounding Box', k='-BOX-', enable_events=True, disabled=True, font='_ 16')],
-                [sg.Check('Show Velocity', disabled=True, k='-VELOCITY-', enable_events=True, font='_ 16')],
                 [sg.VPush()],
+                [sg.Check('Show Velocity', disabled=True, k='-VELOCITY-', enable_events=True, font='_ 16')],
                 [sg.Combo(['m/s', 'km/h', 'ft/s', 'mph'], default_value='km/h', k='-VEL UNITS-',
                         enable_events=True, disabled=True, readonly=True,
                         tooltip='Velocity Units\nOnly available after\ndistance calibration and object tracking', font='_ 16')],
+                [sg.VPush()],
+                [sg.Text('Path Color:', font='_ 16'), sg.Combo(['white', 'black', 'red', 'green', 'blue'], default_value='white', readonly=True, k='-PATH COLOR-',
+                        enable_events=True, tooltip='Path Color', font='_ 16', disabled=True)],
                 [sg.VPush()]]
 
     magnifier = [[sg.Slider(range=(100, 10), default_value=40, resolution=10, orientation='v',
