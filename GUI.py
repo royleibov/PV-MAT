@@ -1,5 +1,5 @@
 '''
-GUI for the panoramic stitching app
+GUI for the panoramic video measurement and tracking app
 '''
 
 import threading
@@ -1558,7 +1558,9 @@ def help_window():
         return sg.T(text, key=key, font=font, pad=(0,10), enable_events=True)
 
     help_why = \
-"""Let's start with a review of the Goals of the PanoramicVideoStitching project (the App):
+"""The name PV-MAT (Panoramic Video Measurement and Tracking) is an ironic play on "The Ideal Gas Law: PV=nRT" - There's nothing \
+ideal about the chaotic movement of real-life objects.
+Let's start with a review of the Goals of the PV-MAT project (the App):
 1. To learn more and analyze anything that comes to mind
 2. For you to be successful
 
@@ -1831,7 +1833,7 @@ def make_window1() -> sg.Window:
     layout = [[sg.Text(expand_x=True, expand_y=True, font='ANY 1', pad=(0, 0))],  # the thing that expands from top
               [sg.Column(col, element_justification='center' ,vertical_alignment='center', justification='center', expand_x=True, expand_y=True)]]
 
-    return sg.Window("Panoramic Video Stitching", layout=layout, finalize=True, resizable=True, text_justification='c')
+    return sg.Window("PV-MAT - Panoramic Video Measurement and Tracking", layout=layout, finalize=True, resizable=True, text_justification='c')
 
 
 def make_window2() -> sg.Window:
@@ -1914,7 +1916,7 @@ def make_window2() -> sg.Window:
                sg.Push()],
               [sg.B('Back', font='_ 12'), sg.Push(), sg.B('Exit', font='_ 12')]]
 
-    return sg.Window("Panoramic Video Stitching", layout=layout, finalize=True, resizable=True, element_justification='c')
+    return sg.Window("Panoramic Video Measurement and Tracking", layout=layout, finalize=True, resizable=True, element_justification='c')
 
 def popup_get_distance() -> Tuple[Union[float, None], str]:
     '''
