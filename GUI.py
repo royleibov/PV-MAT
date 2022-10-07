@@ -548,6 +548,10 @@ class GUI:
             if event == '-DIS COLOR-':
                 self.line_color = values[event]
 
+            # Changed distance line color
+            if event == '-DIS COLOR-':
+                self.line_color = values[event]
+
 
             # There's a change of magnify size
             if event == '-MAGNIFY SIZE-' or event == '-MAGNIFY SIZE-+DOWN+':
