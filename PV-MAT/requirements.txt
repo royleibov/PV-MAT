@@ -1,4 +1,0 @@
-numpy==1.22.2
-opencv_python==4.6.0.66
-Pillow==9.2.0
-PySimpleGUI==4.60.4
