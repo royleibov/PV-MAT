@@ -15,3 +15,6 @@ PV-MAT creates a panorama out of a video and lets the user make measurements on 
 
 # License
 
+MIT License
+
+Copyright (c) 2022 Roy Leibovitz
