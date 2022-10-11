@@ -11,7 +11,7 @@ import numpy as np
 import cv2
 import PIL
 import PySimpleGUI as sg
-from base64 import b64encode
+from icon import icon_PVMAT
 from fractions import Fraction
 from PIL import ImageTk, Image, ImageDraw
 from Stitcher import Stitcher
@@ -1839,7 +1839,7 @@ def make_window1() -> sg.Window:
     layout = [[sg.Text(expand_x=True, expand_y=True, font='ANY 1', pad=(0, 0))],  # the thing that expands from top
               [sg.Column(col, element_justification='center' ,vertical_alignment='center', justification='center', expand_x=True, expand_y=True)]]
 
-    return sg.Window("PV-MAT - Panoramic Video Measurement and Tracking", layout=layout, finalize=True, resizable=True, text_justification='c', icon=b64encode(open(r'Icon PV-MAT.png', 'rb').read()))
+    return sg.Window("PV-MAT - Panoramic Video Measurement and Tracking", layout=layout, finalize=True, resizable=True, text_justification='c', icon=icon_PVMAT)
 
 
 def make_window2() -> sg.Window:
@@ -1922,7 +1922,7 @@ def make_window2() -> sg.Window:
                sg.Push()],
               [sg.B('Back', font='_ 12'), sg.Push(), sg.B('Exit', font='_ 12')]]
 
-    return sg.Window("Panoramic Video Measurement and Tracking", layout=layout, finalize=True, resizable=True, element_justification='c', icon=b64encode(open(r'Icon PV-MAT.png', 'rb').read()))
+    return sg.Window("Panoramic Video Measurement and Tracking", layout=layout, finalize=True, resizable=True, element_justification='c', icon=icon_PVMAT)
 
 def popup_get_distance() -> Tuple[Union[float, None], str]:
     '''
