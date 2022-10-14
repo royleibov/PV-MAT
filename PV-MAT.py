@@ -166,10 +166,8 @@ class GUI:
 
             # Tracking progress meter
             if event == '-TRACKING PROGRESS-':
-                scale = sg.DEFAULT_SCALING
-                sg.DEFAULT_SCALING = 1.0
-                sg.one_line_progress_meter('Tracking...', values[event] + 1, self.num_frames)
-                sg.DEFAULT_SCALING = scale
+                sg.one_line_progress_meter('Tracking...', values[event] + 1, self.num_frames,
+                                            orientation='h', no_button=True)
 
 
             if event == '-STITCHER DONE-':
