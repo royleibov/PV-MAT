@@ -17,6 +17,7 @@ from PIL import ImageTk, Image, ImageDraw
 from Stitcher import Stitcher
 from typing import Callable, List, Tuple, Union
 
+SCALE = min(sg.Window.get_screen_size()[0] / 1440.0, sg.Window.get_screen_size()[1] / 900.0)
 
 class GUI:
     '''
@@ -99,13 +100,9 @@ class GUI:
         self.velocity_units = 'km/h'
         self.path_color = 'white'
 
-        # Start threading to load video correctly
-        self.thread(self.update)
-
-
 
         while True: # GUI event loop
-            event, values = self.window.read()
+            event, values = self.window.read(timeout=self.delay*1000)
 
             # Handle exit or window closed
             if event in ("Exit", None, "-EXIT-"):
@@ -169,7 +166,10 @@ class GUI:
 
             # Tracking progress meter
             if event == '-TRACKING PROGRESS-':
+                scale = sg.DEFAULT_SCALING
+                sg.DEFAULT_SCALING = 1.0
                 sg.one_line_progress_meter('Tracking...', values[event] + 1, self.num_frames)
+                sg.DEFAULT_SCALING = scale
 
 
             if event == '-STITCHER DONE-':
@@ -209,7 +209,11 @@ class GUI:
                 del self.window
                 self.window = make_window2()
 
+                # Start threading to load video correctly
+                self.thread(self.update)
+
                 self.window.maximize()
+                self.window.refresh()
 
                 # define elements and attach key bindings
                 self.graph = self.window['-GRAPH-']
@@ -241,10 +245,10 @@ class GUI:
                 # print(self.pano_width, self.pano_height)
 
                 # Set new graph size
-                self.graph_width = self.window.get_screen_size()[0]
+                self.graph_width = self.window.size[0]
                 self.graph_height = int(self.graph_width * self.pano_height / self.pano_width)
-                if self.graph_height > self.window.get_screen_size()[1] * 9/20:
-                    self.graph_height = self.window.get_screen_size()[1] * 9//20
+                if self.graph_height > self.window.size[1] * 9/20:
+                    self.graph_height = self.window.size[1] * 9//20
                     self.graph_width = int(self.graph_height * self.pano_width / self.pano_height)
 
                 self.graph.set_size((self.graph_width, self.graph_height))
@@ -344,7 +348,7 @@ class GUI:
                 WindowName = 'Select Region of Interest'
                 cv2.namedWindow(WindowName)
                 frame = cv2.resize(frame, (self.graph_width, self.graph_height))
-                window_width, window_height = sg.Window.get_screen_size()
+                window_width, window_height = self.window.size
                 move_height = (window_height - self.graph_height) // 2
                 move_width = (window_width - self.graph_width) // 2
                 cv2.setWindowProperty(WindowName, cv2.WND_PROP_TOPMOST, 1)
@@ -593,8 +597,11 @@ class GUI:
             # Actually triggered most of the time with '+MOVE+'
             if event.startswith('-GRAPH-'):
                 # print('Moving!')
-                # Set the magnifying square window: (magnify_size, magnify_size)
-                magnify_size = values['-MAGNIFY SIZE-']
+                try:
+                    # Set the magnifying square window: (magnify_size, magnify_size)
+                    magnify_size = values['-MAGNIFY SIZE-']
+                except KeyError:
+                    continue
 
                 x, y = values['-GRAPH-']
                 if None in (x, y):
@@ -927,6 +934,8 @@ class GUI:
             if event == '-CALIB-':
                 # Not currently in calibration mode
                 if not self.calibrating:
+                    self.play = False
+                    self.window.bring_to_front()
                     if self.last_figure in self.distance_text_id:
                         self.update_distance(self.last_figure, self.draw_distance_text)
 
@@ -1023,6 +1032,8 @@ class GUI:
                 # Reset the stitcher
                 self.stitcher.set_min_match_num(self.min_match_num)
                 self.stitcher.set_f(self.f)
+                del self.frame_locations
+                self.frame_locations = []
 
                 # Reset the working app
                 self.PIL_pano = None
@@ -1048,6 +1059,7 @@ class GUI:
                 self.distance_text_background = {}
                 self.draw_distance_text = False
                 self.line_color = 'white'
+                self.play_pause = None
 
                 self.stitcher.reset_stitcher()
 
@@ -1262,11 +1274,14 @@ class GUI:
 
                     self.current_frame_num += 1
 
-                    # Update the image and the counter outside of the thread
-                    self.window.write_event_value('-THREAD UPDATE-', frame)
+                    try:
+                        # Update the image and the counter outside of the thread
+                        self.window.write_event_value('-THREAD UPDATE-', frame)
 
-                    # Send a graph event to update the magnifier
-                    self.window.write_event_value('-GRAPH-+MOVE+', None)
+                        # Send a graph event to update the magnifier
+                        self.window.write_event_value('-GRAPH-+MOVE+', None)
+                    except AttributeError:
+                        return
                 else:
                     time.sleep(0.35)
                     self.current_frame_num = 1
@@ -1549,6 +1564,8 @@ def help_window():
     '''
     Initalize the help window.
     '''
+    global SCALE
+
     heading_font = '_ 20 bold underline'
     text_font = '_ 16'
     question_font = '_ 18'
@@ -1727,8 +1744,9 @@ PySimpleGUI community's guidence. I'm sure I will build many more programs and p
                  sg.T('Points for Thought', font=heading_font, pad=(0,10), key='-Q5-TEXT', enable_events=True)],
                 [sg.pin(HelpText(points_to_improve, visible=False, key='-A5-'))]
               ]
-    window = sg.Window('GUI Help', [[sg.Col(layout, scrollable=True, vertical_scroll_only=True, expand_y=True, k='-COL-')], [sg.B('Close')]],
-                            keep_on_top=True, finalize=True, resizable=True)
+    window = sg.Window('GUI Help', [[sg.Push(), sg.Col(layout, scrollable=True, vertical_scroll_only=True, expand_y=True, k='-COL-'), sg.Push()],
+                                    [sg.B('Close')]],
+                            keep_on_top=True, finalize=True, resizable=True, scaling=SCALE, icon=icon_PVMAT)
     window.set_size((window.size[0], sg.Window.get_screen_size()[1]))
 
     while True:
@@ -1757,7 +1775,7 @@ def expert_mode_window(stitcher: Stitcher, min_num: int, max_num:int, f: int):
     '''
     A window to chagne the stitcher's parameters.
     '''
-    layout = [[sg.Text('min_match_num', size=(15,1), font='_ 14'), sg.Input(default_text=f'{min_num}', size=(8,1), k='-MIN-', enable_events=True, font='_ 14'),
+    col = [[sg.Text('min_match_num', size=(15,1), font='_ 14'), sg.Input(default_text=f'{min_num}', size=(8,1), k='-MIN-', enable_events=True, font='_ 14'),
                sg.Text('?', font='_ 14', size=(1,1), tooltip='Controls the minimum amount of overlap between\nstitched frames of the panorama.\nThe smaller min_match_num is, the lesser the overlap.\nIT\'S BETTER TO TINKER WITH max_match_num!')],
               [sg.Text('max_match_num', size=(15,1), font='_ 14'), sg.Input(default_text=f'{max_num}', size=(8,1), k='-MAX-', enable_events=True, font='_ 14'),
                sg.Text('?', font='_ 14', size=(1,1), tooltip='Controls the maximum amount of overlap between\nstitched frames of the panorama.\nThe larger max_match_num is, the greater the overlap.')],
@@ -1767,7 +1785,13 @@ def expert_mode_window(stitcher: Stitcher, min_num: int, max_num:int, f: int):
                sg.Text('?', font='_ 14', size=(1,1), tooltip='Controls the amount by which the quality decreases.\nBest for debuging and perfecting the\nappropriate parameters for a given video.')],
               [sg.B('Save', font='_ 14')]]
 
-    window = sg.Window('Expert Mode', layout, text_justification='c', finalize=True, resizable=True, modal=True)
+    layout = [[sg.Text(expand_x=True, expand_y=True, font='ANY 1', pad=(0, 0))],  # the thing that expands from top
+              [sg.Column(col, element_justification='center' ,vertical_alignment='center', justification='center',
+                            expand_x=True, expand_y=True)]]
+
+
+    window = sg.Window('Expert Mode', layout, text_justification='c', finalize=True, resizable=True, modal=True,
+                            scaling=1.0, icon=icon_PVMAT)
 
     values = None
 
@@ -1798,10 +1822,12 @@ def make_progressbar() -> sg.Window:
     '''
     Make the progressbar popup.
     '''
+    global SCALE
+
     layout = [[sg.ProgressBar(100, key='-PROGRESS BAR-', size=(100, 20)), sg.Text('0%', k='-PERCENT-', font=('Helvetica', 16))],
                 [sg.Push(), sg.Text('Loading...', key='-TEXT-', font=('Helvetica', 16)), sg.Push()]]
 
-    return sg.Window("Making the panorama...", layout, finalize=True, disable_close=True, keep_on_top=True)
+    return sg.Window("Making the panorama...", layout, finalize=True, disable_close=True, keep_on_top=True, scaling=SCALE, icon=icon_PVMAT)
 
 def make_tracking_window():
     '''
@@ -1813,7 +1839,8 @@ def make_tracking_window():
               [sg.Text('In the next window, to cancel the tracking press the \'C\' letter key on your keyboard.', font='_ 14')],
               [sg.B('Next', font='_ 14', k='-NEXT-')]]
 
-    window = sg.Window("Track Object", layout, finalize=True, disable_close=True, keep_on_top=True, element_justification='c', text_justification='c', modal=True)
+    window = sg.Window("Track Object", layout, finalize=True, disable_close=True, keep_on_top=True, element_justification='c',
+                        text_justification='c', modal=True, scaling=1.0, icon=icon_PVMAT)
     window['-NEXT-'].set_focus(True)
     window.bind('<Return>', '-NEXT-')
 
@@ -1826,6 +1853,8 @@ def make_window1() -> sg.Window:
     '''
     Make window1 of browsing.
     '''
+    global SCALE
+
     col = [[sg.Text(s=(6,1), k='-SIZER-'), sg.Push(), sg.Text('Select video', font='_ 16'), sg.Push(),
             sg.vtop(sg.pin(sg.B('More', font='_ 14', visible=False, k='-EXPERT-'))),
             sg.vtop(sg.pin(sg.B('Help', font='_ 14', k='-HELP-')))
@@ -1839,13 +1868,16 @@ def make_window1() -> sg.Window:
     layout = [[sg.Text(expand_x=True, expand_y=True, font='ANY 1', pad=(0, 0))],  # the thing that expands from top
               [sg.Column(col, element_justification='center' ,vertical_alignment='center', justification='center', expand_x=True, expand_y=True)]]
 
-    return sg.Window("PV-MAT - Panoramic Video Measurement and Tracking", layout=layout, finalize=True, resizable=True, text_justification='c', icon=icon_PVMAT)
+    return sg.Window("PV-MAT - Panoramic Video Measurement and Tracking", layout=layout, finalize=True, resizable=True,
+                        text_justification='c', icon=icon_PVMAT, scaling=SCALE)
 
 
 def make_window2() -> sg.Window:
     '''
     Make window2 of actual app functionality.
     '''
+    global SCALE
+
     distance_toolbar = [[sg.VPush()],
            [sg.R('Draw Line', 1, k='-LINE-', enable_events=True, font=('Helvetica', 16), disabled=True)],
            [sg.R('Select and Edit Line', 1, k='-SELECT-', enable_events=True, font=('Helvetica', 16), disabled=True)],
@@ -1922,7 +1954,8 @@ def make_window2() -> sg.Window:
                sg.Push()],
               [sg.B('Back', font='_ 12'), sg.Push(), sg.B('Exit', font='_ 12')]]
 
-    return sg.Window("Panoramic Video Measurement and Tracking", layout=layout, finalize=True, resizable=True, element_justification='c', icon=icon_PVMAT)
+    return sg.Window("Panoramic Video Measurement and Tracking", layout=layout, finalize=True, resizable=True,
+                        element_justification='c', icon=icon_PVMAT, scaling=SCALE)
 
 def popup_get_distance() -> Tuple[Union[float, None], str]:
     '''
@@ -1937,7 +1970,8 @@ def popup_get_distance() -> Tuple[Union[float, None], str]:
               ],
                [sg.Button('Ok', size=(6, 1), bind_return_key=True, focus=True), sg.Button('Cancel', size=(6, 1), bind_return_key=True)]]
 
-    window = sg.Window(title='Get Distance', layout=layout,  auto_size_text=True, keep_on_top=True, finalize=True, modal=True)
+    window = sg.Window(title='Get Distance', layout=layout,  auto_size_text=True, keep_on_top=True, finalize=True,
+                        modal=True, scaling=1.0, icon=icon_PVMAT)
     window['-IN-'].bind("<FocusIn>", "+FOCUS IN+")
     window['-IN-'].bind("<FocusOut>", "+FOCUS OUT+")
     window['-IN-'].bind("<Button-1>", "+CLICK+")
