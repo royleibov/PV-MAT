@@ -1281,7 +1281,6 @@ class GUI:
                     except AttributeError:
                         return
                 else:
-                    time.sleep(0.35)
                     self.current_frame_num = 1
 
 
