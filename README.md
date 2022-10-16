@@ -16,7 +16,7 @@ To directrly install PV-MAT to your computer choose the appropriate file for you
 
 - **[Windows:](https://mega.nz/file/20FhUKpB#6cznQwsbpUj4T1nu9jX3rayu0yAYX4113BUgLxG9L00)** After unzipping the ```PV-MAT for Windows.zip``` file (by right clicking it and selecting *Extract All*), go into the ```PV-MAT``` folder, find and double click the file called ```PV-MAT.exe``` (the ```.exe``` may be missing). If a *"Windows protected your PC"* error message pops up, click *"More info"* and *"Run anyway"*. Sometimes windows justifiably doesn't trust programs downloaded from the internet, and so tries to prevent their opening.
 
-
+You can [download the demo video here](https://mega.nz/file/f9ERhYaQ#J7wMQrfppweOgWFkCc-vw-aCCHnT5u-d6UhH41NGYnQ), if you would like to tinker with the program. Feel free to test it on any video you would like.
 
 # Usage
 
