@@ -6,8 +6,12 @@ PV-MAT creates a panorama out of a video and lets the user make measurements on 
 
 # Demo
 
+![A Demo Video](https://media.giphy.com/media/9T2B1uNsMnHdCwcI3V/giphy.gif)
 
 # Installation
+
+## MacOS
+
 
 
 # Usage
