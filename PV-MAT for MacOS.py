@@ -111,9 +111,7 @@ class GUI:
 
             # Entered expert mode
             if event == '-EXPERT-':
-                self.window.disable()
                 expert_mode_window(self.stitcher, self.min_match_num, self.max_match_num, self.f)
-                self.window.enable()
 
                 # Save the settings for later only if the resolution wasn't played with
                 if self.stitcher.get_resize_factor() == 1:
@@ -334,9 +332,7 @@ class GUI:
                 self.window.refresh()
 
                 # Show instructions
-                self.window.disable()
                 make_tracking_window()
-                self.window.enable()
 
                 # Prepare ROI selection window
                 frame = self.frame_locations[0][0]
@@ -352,9 +348,7 @@ class GUI:
                 cv2.setWindowProperty(WindowName, cv2.WND_PROP_TOPMOST, 1)
                 cv2.moveWindow(WindowName, move_width, move_height)
 
-                self.window.disable()
                 bbox = cv2.selectROI(WindowName, frame, True) # bbox: (top_left_x, top_left_y, box_width, box_height)
-                self.window.enable()
 
                 # print(f'bbox: {bbox} 0')
                 cv2.destroyAllWindows()
@@ -1744,7 +1738,7 @@ PySimpleGUI community's guidence. I'm sure I will build many more programs and p
     window = sg.Window('GUI Help', [[sg.Push(), sg.Col(layout, scrollable=True, vertical_scroll_only=True, expand_y=True, k='-COL-'), sg.Push()],
                                     [sg.B('Close')]],
                             keep_on_top=True, finalize=True, resizable=True, scaling=SCALE, icon=icon_PVMAT)
-    window.set_size((window.size[0], sg.Window.get_screen_size()[1]))
+    window.size = (window.size[0], sg.Window.get_screen_size()[1])
 
     while True:
         event, _ = window.read()
