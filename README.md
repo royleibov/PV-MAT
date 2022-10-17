@@ -59,7 +59,7 @@ If you prefer to clone this project and direclty run it on your machine do the f
 5. Run the app fit for your operating system
 
 ```bash
-  python PV-MAT\ for\ (Windows/MacOS).py
+  python "PV-MAT for (Windows/MacOS).py"
 ```
 
 # Usage
