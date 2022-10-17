@@ -38,16 +38,15 @@ If you prefer to clone this project and direclty run it on your machine do the f
 
 3. I would recommend you build a virtual environment in your chosen folder and activate it
 
-```bash
-  python -m venv ./
-```
 - **For windows:**
-```console
+```cmd
+  py -m venv ./
   Scripts\activate.bat
 ```
 
 - **For MacOS:**
 ```bash
+  python -m venv ./
   source bin/activate
 ```
 
