@@ -39,7 +39,7 @@ If you prefer to clone this project and direclty run it on your machine do the f
 3. I would recommend you build a virtual environment in your chosen folder
 
 ```bash
-  python -m venv
+  python -m venv ./
 ```
 
 4. Install dependencies
