@@ -27,7 +27,7 @@ If you prefer to clone this project and direclty run it on your machine do the f
 1. Clone the project
 
 ```bash
-  git clone https://github.com/royleibov/PV-MAT
+  git clone https://github.com/royleibov/PV-MAT.git
 ```
 
 2. Go to the project directory
