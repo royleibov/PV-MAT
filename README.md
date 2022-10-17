@@ -24,7 +24,7 @@ If you prefer to clone this project and direclty run it on your machine do the f
 
 0. If you don't already have Python on your machine, [install it here](https://www.python.org/downloads/).
 
-1. Clone the project
+1. Clone the project or [simply download a zip file](https://github.com/royleibov/PV-MAT/archive/refs/heads/master.zip)
 
 ```bash
   git clone https://github.com/royleibov/PV-MAT.git
@@ -36,10 +36,19 @@ If you prefer to clone this project and direclty run it on your machine do the f
   cd PV-MAT
 ```
 
-3. I would recommend you build a virtual environment in your chosen folder
+3. I would recommend you build a virtual environment in your chosen folder and activate it
 
 ```bash
   python -m venv ./
+```
+- **For windows:**
+```console
+  Scripts\activate.bat
+```
+
+- **For MacOS:**
+```bash
+  source bin/activate
 ```
 
 4. Install dependencies
@@ -59,6 +68,6 @@ If you prefer to clone this project and direclty run it on your machine do the f
 
 # License
 
-MIT License
+[MIT License](LICENSE.txt)
 
 Copyright (c) 2022 Roy Leibovitz
