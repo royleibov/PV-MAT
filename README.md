@@ -18,6 +18,8 @@ To directrly install PV-MAT to your computer choose the appropriate file for you
 
 You can [download the demo video here](https://mega.nz/file/f9ERhYaQ#J7wMQrfppweOgWFkCc-vw-aCCHnT5u-d6UhH41NGYnQ), if you would like to tinker with the program. Feel free to test it on any video you would like.
 
+If you're experiencing difficulties downloading from MEGA, please try [this Google Drive link](https://drive.google.com/drive/folders/1wLxbNh44YoFdtFHFEB5kAItohY3YhkEB?usp=sharing).
+
 ### Build on your machine
 
 If you prefer to clone this project and direclty run it on your machine do the following:
