@@ -72,7 +72,7 @@ The stitching algorithm consists of 5 steps:
 1. Choosing what frames to stitch - Not every frame of the video is eventually chosen for the final panorama, so as to reduce redundancy and speed up the computation. Each frame is searched for unique "key-points", special areas in the image which can be found despite spatial changes. A choice is done by minimizing the overlapping key-points between consecutive frames as much as possible.
 2. Creating an Homography matrix - a matrix to relate pixels from one image to another is created - the homography matrix. 
 3. Cylindrical projection - The images are then projected onto a cylinder, to correct for the warping done when panning the camera across a scene (the cylinder’s curvature can be controlled by in Expert Mode to allow maximum generalizability).
-4. Creating the panorama - each frame is warped by the homography matrix and an stitched onto one big panorama. This is done without recalculating the homography after each stitching.
+4. Creating the panorama - Each frame is warped by the homography matrix and stitched onto one big panorama. This is done without recalculating the homography after each stitching.
 5. Attaching all the video frames to the panorama - Each frame of the video is warped and placed in the correct place on the panorama to create a Panoramic Video.
 
 Some useful information about Expert Mode, and many more features, can be found in the Help menu present in the app.
