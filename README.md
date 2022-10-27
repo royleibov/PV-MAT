@@ -66,7 +66,7 @@ If you prefer to clone this project and direclty run it on your machine do the f
 
 # How does it work?
 
-Understanding the stitching pipeline can help achieve correct panoramas for almos any video input. The program is generalizable through Expert Mode, to allow different types, angles, and speeds of videos to be correctly transformed into a panorama.
+Understanding the stitching pipeline can help achieve correct panoramas for almost any video input. The program is generalizable through Expert Mode, to allow different types, angles, and speeds of videos to be correctly transformed into a panorama.
 
 The stitching algorithm consists of 5 steps:
 1. Choosing what frames to stitch - Not every frame of the video is eventually chosen for the final panorama, so as to reduce redundancy and speed up the computation. Each frame is searched for unique "key-points", special areas in the image which can be found despite spatial changes. A choice is done by minimizing the overlapping key-points between consecutive frames as much as possible.
